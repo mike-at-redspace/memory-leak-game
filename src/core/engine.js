@@ -352,7 +352,7 @@ export class GameEngine {
       `${isHeal ? '+' : ''}${item.health}KB`,
       isHeal ? 'heal' : 'damage'
     )
-    isHeal ? this.audio.playCollect() : this.audio.playDamage()
+    isHeal ? this.audio.playHealth() : this.audio.playDamage()
   }
 
   /**
@@ -382,7 +382,7 @@ export class GameEngine {
       isBoost ? 'BOOST!' : 'LAG...',
       isBoost ? 'boost' : 'slow'
     )
-    isBoost ? this.audio.playPowerUp() : this.audio.playDamage()
+    isBoost ? this.audio.playPowerUp() : this.audio.playDebuff()
   }
 
   /**

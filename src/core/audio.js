@@ -199,6 +199,24 @@ export class AudioController {
   }
 
   /**
+   * Triggers the "Debuff/Slow" sound effect.
+   *
+   * @returns {void}
+   */
+  playDebuff() {
+    this.playTone(SoundPresets.DEBUFF)
+  }
+
+  /**
+   * Triggers the "Health" sound effect.
+   *
+   * @returns {void}
+   */
+  playHealth() {
+    this.playTone(SoundPresets.HEALTH)
+  }
+
+  /**
    * Stops playback, disconnects nodes, and releases the AudioContext.
    *
    * @returns {void}
