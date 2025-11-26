@@ -69,12 +69,12 @@ export const ITEM_REGISTRY = Object.freeze([
   { id: "ticketstorm", emoji: "🗃️", name: "Unexpected Ticket Avalanche", score: 25, rarity: 0.03, isSlow: true },
 
   // --- HAZARDS ---
-  { id: "bsod", emoji: "🟦", name: "BSOD (Your Soul Exits the Body)", score: 0, rarity: 0.02, health: -150 },
-  { id: "dns", emoji: "🌐", name: "It’s ALWAYS DNS", score: 20, rarity: 0.035, health: -40 },
+  { id: "bsod", emoji: "🟦", name: "BSOD (Your Soul Exits the Body)", score: 0, rarity: 0.02, health: -128 },
+  { id: "dns", emoji: "🌐", name: "It’s ALWAYS DNS", score: 20, rarity: 0.035, health: -48 },
   { id: "cors", emoji: "🚧", name: "CORS Error (Fun Ends Here)", score: 20, rarity: 0.04, health: -30 },
-  { id: "node_modules", emoji: "🕳️", name: "Deleting node_modules… Forever", score: 10, rarity: 0.05, health: -20 },
-  { id: "syntax", emoji: "‼️", name: "Syntax Error at 3am", score: 10, rarity: 0.04, health: -25 },
-  { id: "merge", emoji: "⚔️", name: "Merge Conflict (Choose Your Fighter)", score: 20, rarity: 0.03, health: -50 },
-  { id: "deprecated", emoji: "📛", name: "Deprecated Dependency (Good Luck)", score: 10, rarity: 0.05, health: -35 },
+  { id: "node_modules", emoji: "🕳️", name: "Deleting node_modules… Forever", score: 10, rarity: 0.05, health: -24 },
+  { id: "syntax", emoji: "‼️", name: "Syntax Error at 3am", score: 10, rarity: 0.04, health: -24 },
+  { id: "merge", emoji: "⚔️", name: "Merge Conflict (Choose Your Fighter)", score: 20, rarity: 0.03, health: -48 },
+  { id: "deprecated", emoji: "📛", name: "Deprecated Dependency (Good Luck)", score: 10, rarity: 0.05, health: -32 },
   { id: "wifi", emoji: "🛜", name: "Wi-Fi Drops During Outage", score: 10, rarity: 0.045, health: -20 }
 ])

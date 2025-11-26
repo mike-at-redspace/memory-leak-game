@@ -169,8 +169,11 @@ export class HudRenderer {
     // Grid Items
     const cellWidth =
       (panel.w - layout.gridItemPadding * 2 * scale) / layout.gridColumns
+    const pulseTimers = hud.collectedPulseTimers
+    const pulseDuration = HudConfig.gridPulseDuration
     this._ctx.font = `${layout.emojiFontSize * scale}px sans-serif`
     this._ctx.textAlign = 'center'
+    this._ctx.fillStyle = Colors.ItemFill
 
     this._targetItems.forEach((item, i) => {
       const col = i % layout.gridColumns
@@ -187,15 +190,34 @@ export class HudRenderer {
         row * layout.gridRowHeight * scale
 
       const isCollected = hud.collectedIds.has(item.id)
+      const pulseRemaining = pulseTimers?.get(item.id) ?? 0
+      const isPulsing = isCollected && pulseDuration > 0 && pulseRemaining > 0
+      const pulseProgress = isPulsing
+        ? Math.max(0, Math.min(1, 1 - pulseRemaining / pulseDuration))
+        : 0
+      const easedPulse = isPulsing ? Math.sin(pulseProgress * Math.PI) : 0
+      const baseAlpha = isCollected ? 1 : HudConfig.gridItemDimAlpha
+      const scaleFactor = isPulsing
+        ? 1 + HudConfig.gridPulseMaxScale * easedPulse
+        : 1
+      const targetAlpha = isPulsing
+        ? Math.min(1, baseAlpha + HudConfig.gridPulseAlphaBoost * easedPulse)
+        : baseAlpha
 
-      this._ctx.globalAlpha = isCollected ? 1 : HudConfig.gridItemDimAlpha
-      if (!isCollected) this._ctx.filter = 'grayscale(100%)'
+      this._ctx.save()
+      if (!isCollected) {
+        this._ctx.filter = 'grayscale(100%)'
+      }
 
+      if (isPulsing) {
+        this._ctx.translate(px, py)
+        this._ctx.scale(scaleFactor, scaleFactor)
+        this._ctx.translate(-px, -py)
+      }
+
+      this._ctx.globalAlpha = isPulsing ? targetAlpha : baseAlpha
       this._ctx.fillText(item.emoji, px, py)
-
-      // Reset context state
-      this._ctx.filter = 'none'
-      this._ctx.globalAlpha = 1
+      this._ctx.restore()
     })
   }
 

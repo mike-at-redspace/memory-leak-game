@@ -12,7 +12,8 @@ import {
   PhysicsConfig,
   SpriteConfig,
   TARGET_ITEMS,
-  ItemOutlineColors
+  ItemOutlineColors,
+  HudConfig
 } from '../config/index.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
 
@@ -186,6 +187,7 @@ export class GameEngine {
 
     this.stats.playerHealth -= (StatsConfig.MemoryLeakRate * dt) / 1000
     if (this.hud.messageTimer > 0) this.hud.messageTimer -= dt
+    this._updateHudPulseTimers(dt)
     this.particles.update(dt)
 
     this._checkGameStateTransitions()
@@ -400,6 +402,7 @@ export class GameEngine {
     if (!this.collectedUniqueIds.has(item.id)) {
       this.collectedUniqueIds.add(item.id)
       this.hud.collectedIds.add(item.id)
+      this.hud.collectedPulseTimers.set(item.id, HudConfig.gridPulseDuration)
       this.stats.uniqueFound = this.collectedUniqueIds.size
     }
     this.particles.spawn(x, y, `+${item.score}`, 'score')
@@ -423,6 +426,26 @@ export class GameEngine {
     else if (item.isBoost) this.hud.messageColor = ItemOutlineColors.boost
     else if (item.isSlow) this.hud.messageColor = ItemOutlineColors.slow
     else this.hud.messageColor = Colors.Warning
+  }
+
+  /**
+   * Ticks down the pulse timers used by the cache dump inventory grid.
+   *
+   * @param {number} dt  - Delta time in milliseconds.
+   * @returns {void}
+   */
+  _updateHudPulseTimers(dt) {
+    const timers = this.hud.collectedPulseTimers
+    if (!timers || timers.size === 0) return
+
+    for (const [id, remaining] of timers.entries()) {
+      const next = remaining - dt
+      if (next <= 0) {
+        timers.delete(id)
+      } else {
+        timers.set(id, next)
+      }
+    }
   }
 
   /**
@@ -500,7 +523,8 @@ export class GameEngine {
       lastMessage: '',
       messageColor: '#fff',
       messageTimer: 0,
-      collectedIds: new Set()
+      collectedIds: new Set(),
+      collectedPulseTimers: new Map()
     }
   }
 

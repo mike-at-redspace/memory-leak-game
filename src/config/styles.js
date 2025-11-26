@@ -64,6 +64,9 @@ export const Fonts = Object.freeze({
  *   healthWarningThreshold: number
  *   messageFadeDuration: number
  *   textVerticalOffset: number
+ *   gridPulseDuration: number
+ *   gridPulseMaxScale: number
+ *   gridPulseAlphaBoost: number
  * }>}
  */
 export const HudConfig = Object.freeze({
@@ -71,7 +74,10 @@ export const HudConfig = Object.freeze({
   healthCriticalThreshold: 0.25,
   healthWarningThreshold: 0.5,
   messageFadeDuration: 500,
-  textVerticalOffset: 2
+  textVerticalOffset: 2,
+  gridPulseDuration: 450,
+  gridPulseMaxScale: 0.55,
+  gridPulseAlphaBoost: 0.35
 })
 
 /**
