@@ -28,7 +28,15 @@ export const Colors = Object.freeze({
   Success: '#2ecc71',
   Warning: '#f1c40f',
   Danger: '#e74c3c',
-  Info: '#00f2ff'
+  Info: '#00f2ff',
+  ItemFill: '#ffffff'
+})
+
+export const ItemOutlineColors = Object.freeze({
+  hazard: Colors.Danger,
+  heal: Colors.Success,
+  slow: Colors.Warning,
+  boost: Colors.Info
 })
 
 /**

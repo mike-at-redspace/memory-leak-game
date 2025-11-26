@@ -11,7 +11,8 @@ import {
   StatsConfig,
   PhysicsConfig,
   SpriteConfig,
-  TARGET_ITEMS
+  TARGET_ITEMS,
+  ItemOutlineColors
 } from '../config/index.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
 
@@ -417,8 +418,10 @@ export class GameEngine {
     this.hud.lastMessage = `${item.emoji} ${item.name}`
     this.hud.messageTimer = 3000
 
-    if (item.health < 0 || item.isSlow) this.hud.messageColor = Colors.Danger
-    else if (item.health > 0) this.hud.messageColor = Colors.Success
+    if (item.health < 0) this.hud.messageColor = ItemOutlineColors.hazard
+    else if (item.health > 0) this.hud.messageColor = ItemOutlineColors.heal
+    else if (item.isBoost) this.hud.messageColor = ItemOutlineColors.boost
+    else if (item.isSlow) this.hud.messageColor = ItemOutlineColors.slow
     else this.hud.messageColor = Colors.Warning
   }
 

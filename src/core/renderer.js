@@ -6,7 +6,8 @@ import {
   PhysicsConfig,
   TileTypes,
   SpriteConfig,
-  ParticleConfig
+  ParticleConfig,
+  ItemOutlineColors
 } from '../config/index.js'
 import { HudRenderer } from './ui/hud.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
@@ -322,10 +323,59 @@ export class Renderer {
    * @access private
    */
   _drawItem(item, x, y, size) {
+    this._ctx.save()
     this._ctx.font = '30px sans-serif'
     this._ctx.textAlign = 'center'
     this._ctx.textBaseline = 'middle'
-    this._ctx.fillText(item.emoji, x + size / 2, y + size / 2 + 5)
+
+    const centerX = x + size / 2
+    const centerY = y + size / 2 + 5
+    const outlineColor = this._getItemOutlineColor(item)
+
+    if (outlineColor) {
+      this._drawEmojiOutline(item.emoji, centerX, centerY, outlineColor, 2.5)
+    }
+
+    this._ctx.fillStyle = Colors.ItemFill
+    this._ctx.fillText(item.emoji, centerX, centerY)
+    this._ctx.restore()
+  }
+
+  _drawEmojiOutline(text, x, y, color, thickness) {
+    const steps = 12
+    this._ctx.save()
+    this._ctx.fillStyle = color
+
+    for (let i = 0; i < steps; i++) {
+      const angle = (Math.PI * 2 * i) / steps
+      const offsetX = Math.cos(angle) * thickness
+      const offsetY = Math.sin(angle) * thickness
+
+      this._ctx.shadowColor = color
+      this._ctx.shadowBlur = 0
+      this._ctx.shadowOffsetX = offsetX
+      this._ctx.shadowOffsetY = offsetY
+
+      this._ctx.fillText(text, x, y)
+    }
+
+    this._ctx.shadowColor = 'transparent'
+    this._ctx.shadowBlur = 0
+    this._ctx.shadowOffsetX = 0
+    this._ctx.shadowOffsetY = 0
+    this._ctx.restore()
+  }
+
+  _getItemOutlineColor(item) {
+    if (typeof item.health === 'number') {
+      // if (item.health < 0) return ItemOutlineColors.hazard
+      if (item.health > 0) return ItemOutlineColors.heal
+    }
+
+    // if (item.isSlow) return ItemOutlineColors.slow
+    // if (item.isBoost) return ItemOutlineColors.boost
+
+    return null
   }
 
   /**
@@ -397,27 +447,27 @@ export class Renderer {
    * @access private
    */
   _getParticleStyle(p) {
-    let color = '#f1c40f'
+    let color = Colors.Warning
     let scale = 1
     let font = `bold 16px ${Fonts.Monospace}`
 
     switch (p.type) {
       case 'damage':
         scale = 1 + (1 - p.life) * 0.5
-        color = Colors.Danger
+        color = ItemOutlineColors.hazard
         font = `900 20px ${Fonts.Primary}`
         break
       case 'heal':
-        color = Colors.Success
+        color = ItemOutlineColors.heal
         font = `900 18px ${Fonts.Monospace}`
         break
       case 'boost':
         scale = 0.5 + (1 - p.life) * 1.5
-        color = Colors.Info
+        color = ItemOutlineColors.boost
         font = `900 20px ${Fonts.Primary}`
         break
       case 'slow':
-        color = '#9b59b6'
+        color = ItemOutlineColors.slow
         font = `900 24px ${Fonts.Primary}`
         break
     }
