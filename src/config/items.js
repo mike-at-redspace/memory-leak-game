@@ -44,8 +44,8 @@ export const ITEM_REGISTRY = Object.freeze([
   // --- HEALING & SURVIVAL ---
   { id: "coffee", emoji: "☕", name: "Coffee (Programmer Blood Type)", score: 50, rarity: 0.06, health: 40 },
   { id: "pizza", emoji: "🍕", name: "Hackathon Pizza (Cold but Powerful)", score: 50, rarity: 0.05, health: 64 },
-  { id: "rubberduck", emoji: "🦆", name: "Rubber Duck Debugging Session", score: 50, rarity: 0.05, health: 16 },
-  { id: "restart", emoji: "🔁", name: "Classic IT Fix (Turn It Off & On)", score: 100, rarity: 0.03, health: 16 },
+  { id: "rubberduck", emoji: "🦆", name: "Rubber Duck Debugging Session", score: 50, rarity: 0.05, health: 128 },
+  { id: "restart", emoji: "🔁", name: "Classic IT Fix (Turn It Off & On)", score: 100, rarity: 0.03, health: 56 },
   { id: "docker", emoji: "🐳", name: "“Works in Docker” Miracle", score: 150, rarity: 0.03, health: 16 },
   { id: "freshair", emoji: "🌿", name: "Touch Grass (Mental RAM Restored)", score: 40, rarity: 0.06, health: 32 },
   { id: "sleep", emoji: "🛌", name: "Actual Full Night of Sleep", score: 80, rarity: 0.055, health: 48 },
