@@ -5,6 +5,7 @@ import {
   CollisionConfig,
   ITEM_REGISTRY,
   StatsConfig,
+  TARGET_ITEMS,
   Directions,
   ScreenConfig,
   ProcGenConfig
@@ -26,6 +27,8 @@ export class World {
       (sum, item) => sum + item.rarity,
       0
     )
+    this._guaranteedItemTiles = new Map()
+    this._populateGuaranteedItems()
   }
 
   /**
@@ -106,8 +109,12 @@ export class World {
    * @returns {Object | null} The item definition or null.
    */
   getItemAt(tx, ty) {
-    if (this._collectedItems.has(`${tx},${ty}`)) return null
+    const key = `${tx},${ty}`
+    if (this._collectedItems.has(key)) return null
     if (this.getTileType(tx, ty) === TileTypes.WALL) return null
+
+    const guaranteedItem = this._guaranteedItemTiles.get(key)
+    if (guaranteedItem) return guaranteedItem
 
     const seed = (tx * PROC_GEN.ItemSeed.X) ^ (ty * PROC_GEN.ItemSeed.Y)
     if (seededRandom(seed) > PROC_GEN.SpawnChance) return null
@@ -121,6 +128,54 @@ export class World {
     }
 
     return null
+  }
+
+  /**
+   * Prepares a fixed mapping from tiles to required collectibles so every
+   * target item is present at least once in the world.
+   *
+   * @returns {void}
+   * @access private
+   */
+  _populateGuaranteedItems() {
+    const required = TARGET_ITEMS.length
+    if (required === 0) return
+
+    let limit = Math.max(160, required * 3)
+    let candidateTiles = this._collectFloorTiles(required, limit)
+
+    while (candidateTiles.length < required && limit <= 400) {
+      limit += 40
+      candidateTiles = this._collectFloorTiles(required, limit)
+    }
+
+    candidateTiles.slice(0, required).forEach((tile, index) => {
+      const key = `${tile.tx},${tile.ty}`
+      this._guaranteedItemTiles.set(key, TARGET_ITEMS[index])
+    })
+  }
+
+  /**
+   * Collects floor tile coordinates within a square radius to assign forced
+   * spawns for guaranteed items.
+   *
+   * @param {number} needed
+   * - Number of floor tiles required.
+   * @param {number} limit
+   * - Radius (in tiles) to examine around the origin.
+   * @returns {Array.<{ tx: number; ty: number }>}
+   */
+  _collectFloorTiles(needed, limit) {
+    const tiles = []
+
+    for (let tx = -limit; tx <= limit && tiles.length < needed; tx++) {
+      for (let ty = -limit; ty <= limit && tiles.length < needed; ty++) {
+        if (this.getTileType(tx, ty) !== TileTypes.FLOOR) continue
+        tiles.push({ tx, ty })
+      }
+    }
+
+    return tiles
   }
 
   /**

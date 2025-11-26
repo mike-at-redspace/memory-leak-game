@@ -27,7 +27,7 @@ export const ITEM_REGISTRY = Object.freeze([
   { id: "monitor", emoji: "🖥️", name: "Dual Vertical Monitors", score: 350, rarity: 0.03 },
   { id: "laptop", emoji: "💻", name: "MacBook Pro M5 (Your Wallet Cried)", score: 350, rarity: 0.03 },
   { id: "keeb", emoji: "⌨️", name: "Custom Thockboard (ASMR Edition)", score: 250, rarity: 0.04 },
-  { id: "headphones", emoji: "🎧", name: "Noise Cancelling (Silences Real Life)", score: 200, rarity: 0.045 },
+  { id: "headphones", emoji: "🎧", name: "Noise Cancelling (Silence is Golden)", score: 200, rarity: 0.045 },
   { id: "pi", emoji: "🥧", name: "Raspberry Pi (Project You'll Never Start)", score: 150, rarity: 0.05 },
   { id: "chair", emoji: "🪑", name: "Ergo Chair (Posture +200%)", score: 180, rarity: 0.045 },
   { id: "standupdesk", emoji: "📈", name: "Standing Desk (Focus Multiplier)", score: 160, rarity: 0.05 },
