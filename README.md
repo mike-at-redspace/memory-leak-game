@@ -100,3 +100,9 @@ Centralized configuration for maintainable gameplay logic:
 - **`index.js`** – re-exports physics, sprite stats, `TARGET_ITEMS`, `GameStates`, camera/collision constants, and `ITEM_REGISTRY` for easy consumption across modules.
 - **`render.js`** – exposes `ParticleConfig` for HUD and renderer helpers.
 - **`sound.js`** – `SoundPresets` for collection, damage, and power-up events, keeping procedural audio constants centralized.
+
+---
+
+## Credits
+
+- Background music licensed via [Pixabay - moodmode](https://pixabay.com/users/moodmode-33139253/).
