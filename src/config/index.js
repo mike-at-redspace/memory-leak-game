@@ -4,18 +4,11 @@ import {
   LayoutConfig,
   Fonts,
   Colors,
-  HudConfig
+  HudConfig,
+  UIConfig
 } from './styles.js'
 import { ParticleConfig } from './render.js'
 import { SoundPresets } from './sound.js'
-
-/** Aggregates UI-facing constants to simplify consumer imports. */
-export const UIConfig = Object.freeze({
-  Screen: ScreenConfig,
-  Layout: LayoutConfig,
-  Fonts,
-  Colors
-})
 
 /**
  * Physics constants that govern movement, animation, and tile math.
@@ -166,4 +159,12 @@ export const GameConfig = Object.freeze({
 export { ParticleConfig }
 export { SoundPresets }
 
-export { ITEM_REGISTRY, ScreenConfig, LayoutConfig, Fonts, Colors, HudConfig }
+export {
+  ITEM_REGISTRY,
+  ScreenConfig,
+  LayoutConfig,
+  Fonts,
+  Colors,
+  HudConfig,
+  UIConfig
+}
