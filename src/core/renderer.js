@@ -7,7 +7,8 @@ import {
   TileTypes,
   SpriteConfig,
   ParticleConfig,
-  ItemOutlineColors
+  ItemOutlineColors,
+  LevelThemes
 } from '../config/index.js'
 import { HudRenderer } from './ui/hud.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
@@ -171,12 +172,22 @@ export class Renderer {
    * @param {boolean}            isMuted    - Audio mute state.
    * @returns {void}
    */
-  renderGame(world, player, camera, particles, stats, hud, isMuted) {
+  renderGame(world, player, camera, particles, stats, hud, isMuted, level) {
     const width = this._canvas.width
     const height = this._canvas.height
 
-    this._drawBackground(width, height)
-    this._drawWorld(world, camera, width, height)
+    // Get theme for current level (1-indexed, so subtract 1)
+    // Ensure level is a valid number, default to 1 if not
+    const currentLevel = level && typeof level === 'number' ? level : 1
+    // Clamp to available themes (levels 1-5 map to indices 0-4)
+    const themeIndex = Math.min(
+      Math.max(0, currentLevel - 1),
+      LevelThemes.length - 1
+    )
+    const theme = LevelThemes[themeIndex]
+
+    this._drawBackground(width, height, theme)
+    this._drawWorld(world, camera, width, height, theme)
     this._drawPlayer(player, camera)
     this._renderParticles(particles, camera)
 
@@ -261,8 +272,8 @@ export class Renderer {
    *
    * @access private
    */
-  _drawBackground(width, height) {
-    this._ctx.fillStyle = Colors.WallShadow
+  _drawBackground(width, height, theme) {
+    this._ctx.fillStyle = theme.WallShadow
     this._ctx.fillRect(0, 0, width, height)
   }
 
@@ -271,7 +282,7 @@ export class Renderer {
    *
    * @access private
    */
-  _drawWorld(world, camera, viewWidth, viewHeight) {
+  _drawWorld(world, camera, viewWidth, viewHeight, theme) {
     const ts = PhysicsConfig.TileSize
 
     // Calculate visible range (culling)
@@ -287,9 +298,9 @@ export class Renderer {
         const screenY = Math.round(ty * ts - camera.y)
 
         if (type === TileTypes.WALL) {
-          this._drawWall(screenX, screenY, ts)
+          this._drawWall(screenX, screenY, ts, theme)
         } else {
-          this._drawFloor(screenX, screenY, ts)
+          this._drawFloor(screenX, screenY, ts, theme)
           const item = world.getItemAt(tx, ty)
           if (item) this._drawItem(item, screenX, screenY, ts)
         }
@@ -300,23 +311,32 @@ export class Renderer {
   /**
    * @access private
    */
-  _drawWall(x, y, size) {
-    this._ctx.fillStyle = Colors.Wall
+  _drawWall(x, y, size, theme) {
+    this._ctx.fillStyle = theme.Wall
     this._ctx.fillRect(x, y, size, size)
+
+    // Simple "panel" texture
+    this._ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+    this._ctx.fillRect(x + 4, y + 4, size - 8, size - 8)
+
     // "3D" depth effect
-    this._ctx.fillStyle = Colors.WallShadow
+    this._ctx.fillStyle = theme.WallShadow
     this._ctx.fillRect(x, y + size - 10, size, 10)
   }
 
   /**
    * @access private
    */
-  _drawFloor(x, y, size) {
-    this._ctx.fillStyle = Colors.Floor
+  _drawFloor(x, y, size, theme) {
+    this._ctx.fillStyle = theme.Floor
     this._ctx.fillRect(x, y, size, size)
-    this._ctx.strokeStyle = Colors.FloorGrid
-    this._ctx.lineWidth = 1
-    this._ctx.strokeRect(x, y, size, size)
+
+    // Optimize: Use fillRect for grid lines instead of strokeRect
+    this._ctx.fillStyle = theme.FloorGrid
+    // Draw bottom line
+    this._ctx.fillRect(x, y + size - 1, size, 1)
+    // Draw right line
+    this._ctx.fillRect(x + size - 1, y, 1, size)
   }
 
   /**

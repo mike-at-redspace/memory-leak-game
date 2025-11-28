@@ -17,10 +17,10 @@
  * }>}
  */
 export const Colors = Object.freeze({
-  Wall: 'color(display-p3 0.227 0.361 0.475)',
-  WallShadow: 'color(display-p3 0.137 0.239 0.310)',
-  Floor: 'color(display-p3 0.498 0.541 0.565)',
-  FloorGrid: 'color(display-p3 0.565 0.761 0.776)',
+  Wall: 'color(display-p3 0.82 0.84 0.86)', // Light grey partition fabric
+  WallShadow: 'color(display-p3 0.61 0.64 0.67)', // Darker grey frame/shadow
+  Floor: 'color(display-p3 0.25 0.29 0.35)', // Dark blue-grey carpet
+  FloorGrid: 'color(display-p3 0.30 0.35 0.42)', // Slightly lighter carpet pattern
   FallbackSprite: 'color(display-p3 1 0.31 0.235)',
   UiBackground: 'rgba(12,16,22,0.9)',
   UiBorder: 'rgba(70,160,255,0.2)',
@@ -38,6 +38,44 @@ export const ItemOutlineColors = Object.freeze({
   slow: Colors.Warning,
   boost: Colors.Info
 })
+
+export const LevelThemes = [
+  // Level 1: Standard Office
+  {
+    Wall: 'color(display-p3 0.42 0.45 0.48)', // Slate Gray P3 (Base)
+    WallShadow: 'color(display-p3 0.25 0.27 0.29)', // Darker slate
+    Floor: 'color(display-p3 0.12 0.25 0.48)', // Darker corporate blue
+    FloorGrid: 'color(display-p3 0.22 0.50 0.95)' // Corporate Blue P3 (Accent)
+  },
+  // Level 2: Startup
+  {
+    Wall: 'color(display-p3 0.05 0.60 0.55)', // Deep Teal P3 (Base)
+    WallShadow: 'color(display-p3 0.03 0.35 0.33)', // Darker teal
+    Floor: 'color(display-p3 0.02 0.15 0.20)', // Very dark teal
+    FloorGrid: 'color(display-p3 0.15 0.85 0.95)' // Electric Cyan P3 (Accent)
+  },
+  // Level 3: Executive
+  {
+    Wall: 'color(display-p3 0.35 0.10 0.05)', // Mahogany P3 (Base)
+    WallShadow: 'color(display-p3 0.20 0.06 0.03)', // Darker mahogany
+    Floor: 'color(display-p3 0.10 0.28 0.18)', // Darker emerald
+    FloorGrid: 'color(display-p3 0.20 0.55 0.35)' // Emerald P3 (Accent)
+  },
+  // Level 4: Server Room
+  {
+    Wall: 'color(display-p3 0.03 0.05 0.08)', // Cold Near-Black P3 (Base)
+    WallShadow: 'color(display-p3 0.01 0.02 0.04)', // Near black
+    Floor: 'color(display-p3 0.02 0.03 0.05)', // Slightly lighter near-black
+    FloorGrid: 'color(display-p3 0.10 0.95 0.40)' // Neon Green P3 (Accent)
+  },
+  // Level 5: The Cloud
+  {
+    Wall: 'color(display-p3 0.97 0.98 1.00)', // Soft White P3 (Base)
+    WallShadow: 'color(display-p3 0.75 0.78 0.80)', // Light gray
+    Floor: 'color(display-p3 0.50 0.70 0.85)', // Medium sky blue
+    FloorGrid: 'color(display-p3 0.25 0.75 1.00)' // Sky Blue P3 (Accent)
+  }
+]
 
 /**
  * Font choices and CDN reference for the UI chrome.

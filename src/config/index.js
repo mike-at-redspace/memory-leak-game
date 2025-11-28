@@ -6,7 +6,8 @@ import {
   Colors,
   HudConfig,
   UIConfig,
-  ItemOutlineColors
+  ItemOutlineColors,
+  LevelThemes
 } from './styles.js'
 import { ParticleConfig } from './render.js'
 import { SoundPresets } from './sound.js'
@@ -168,5 +169,6 @@ export {
   Colors,
   HudConfig,
   UIConfig,
-  ItemOutlineColors
+  ItemOutlineColors,
+  LevelThemes
 }

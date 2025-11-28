@@ -83,6 +83,11 @@ export class GameEngine {
 
     this._boundHandlers.pointer = this.handlePointer.bind(this)
     this.window.addEventListener('pointerdown', this._boundHandlers.pointer)
+
+    // Cheat code buffer
+    this._cheatBuffer = ''
+    this._boundHandlers.keydown = this._handleCheatInput.bind(this)
+    this.window.addEventListener('keydown', this._boundHandlers.keydown)
   }
 
   /**
@@ -118,6 +123,7 @@ export class GameEngine {
   destroy() {
     this.stop()
     this.window.removeEventListener('pointerdown', this._boundHandlers.pointer)
+    this.window.removeEventListener('keydown', this._boundHandlers.keydown)
     this.input.dispose()
     this.renderer.dispose()
     this.audio.dispose()
@@ -295,7 +301,8 @@ export class GameEngine {
         this.particles,
         this.stats,
         this.hud,
-        this.audio.isMuted
+        this.audio.isMuted,
+        this.stats.level
       )
     } else {
       this.renderer.renderEndScreen(
@@ -331,7 +338,44 @@ export class GameEngine {
   }
 
   /**
-   * Applies health modifications from an item.
+   * Calculates level-based health multiplier. Healing becomes less effective,
+   * damage becomes more effective as level increases.
+   *
+   * - @private.
+   *
+   * @param {number}  level      - Current level (1-5).
+   * @param {boolean} isHealing  - Whether this is a healing item (positive
+   *                             health).
+   * @returns {number} Multiplier to apply to health value.
+   */
+  _getHealthMultiplier(level, isHealing) {
+    // Level 1: 1.0x (base)
+    // Level 2: Healing 0.9x, Damage 1.1x
+    // Level 3: Healing 0.8x, Damage 1.2x
+    // Level 4: Healing 0.7x, Damage 1.3x
+    // Level 5: Healing 0.6x, Damage 1.4x
+    const levelOffset = level - 1
+    if (isHealing) {
+      return 1.0 - levelOffset * 0.1 // Decrease healing by 10% per level
+    } else {
+      return 1.0 + levelOffset * 0.1 // Increase damage by 10% per level
+    }
+  }
+
+  /**
+   * Rounds a number to the nearest multiple of 4.
+   *
+   * - @private.
+   *
+   * @param {number} value  - Value to round.
+   * @returns {number} Value rounded to nearest multiple of 4.
+   */
+  _roundToMultipleOf4(value) {
+    return Math.round(value / 4) * 4
+  }
+
+  /**
+   * Applies health modifications from an item with level-based scaling.
    *
    * - @private.
    *
@@ -341,17 +385,20 @@ export class GameEngine {
    * @returns {void}
    */
   _handleHealthItem(item, x, y) {
+    const isHeal = item.health > 0
+    const multiplier = this._getHealthMultiplier(this.stats.level, isHeal)
+    const adjustedHealth = this._roundToMultipleOf4(item.health * multiplier)
+
     this.stats.playerHealth = clamp(
-      this.stats.playerHealth + item.health,
+      this.stats.playerHealth + adjustedHealth,
       0,
       StatsConfig.MaxHealth
     )
-    const isHeal = item.health > 0
 
     this.particles.spawn(
       x,
       y,
-      `${isHeal ? '+' : ''}${item.health}KB`,
+      `${isHeal ? '+' : ''}${adjustedHealth}KB`,
       isHeal ? 'heal' : 'damage'
     )
     isHeal ? this.audio.playHealth() : this.audio.playDamage()
@@ -460,8 +507,12 @@ export class GameEngine {
       this._transitionState(GameStates.GAMEOVER)
       this.audio.playDamage()
     } else if (this.collectedUniqueIds.size >= TARGET_ITEMS.length) {
-      this._transitionState(GameStates.VICTORY)
-      this.audio.playPowerUp()
+      if (this.stats.level < 5) {
+        this._advanceLevel()
+      } else {
+        this._transitionState(GameStates.VICTORY)
+        this.audio.playPowerUp()
+      }
     }
   }
 
@@ -496,6 +547,33 @@ export class GameEngine {
   }
 
   /**
+   * Advances to the next level, resetting the world but keeping stats.
+   *
+   * @access private
+   */
+  _advanceLevel() {
+    this.stats.level++
+    this.world.reset()
+    this.collectedUniqueIds.clear()
+    this.hud.collectedIds.clear()
+    this.hud.collectedPulseTimers.clear()
+
+    // Heal player slightly on level up
+    this.stats.playerHealth = Math.min(
+      this.stats.playerHealth + 100,
+      StatsConfig.MaxHealth
+    )
+
+    const spawn = this.world.findSpawn()
+    this.player.reset(spawn)
+    this.camera.x = spawn.x - this.window.innerWidth / 2
+    this.camera.y = spawn.y - this.window.innerHeight / 2
+
+    this.particles.spawn(spawn.x, spawn.y, `LEVEL ${this.stats.level}`, 'boost')
+    this.audio.playPowerUp()
+  }
+
+  /**
    * Generates the default statistics object.
    *
    * - @private.
@@ -507,7 +585,8 @@ export class GameEngine {
       score: 0,
       itemsCollected: 0,
       uniqueFound: 0,
-      playerHealth: StatsConfig.MaxHealth
+      playerHealth: StatsConfig.MaxHealth,
+      level: 1
     }
   }
 
@@ -546,5 +625,35 @@ export class GameEngine {
     return (
       x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
     )
+  }
+
+  _handleCheatInput(e) {
+    this._cheatBuffer += e.key.toLowerCase()
+    if (this._cheatBuffer.length > 10) {
+      this._cheatBuffer = this._cheatBuffer.slice(-10)
+    }
+
+    if (this._cheatBuffer.endsWith('jump')) {
+      this._activateCheat()
+      this._cheatBuffer = ''
+    }
+  }
+
+  _activateCheat() {
+    console.log('CHEAT ACTIVATED: SKIPPING LEVEL')
+    // Mark all target items as collected
+    TARGET_ITEMS.forEach(item => {
+      this.collectedUniqueIds.add(item.id)
+      this.hud.collectedIds.add(item.id)
+    })
+    // Immediately check and advance level if needed
+    if (this.collectedUniqueIds.size >= TARGET_ITEMS.length) {
+      if (this.stats.level < 5) {
+        this._advanceLevel()
+      } else {
+        this._transitionState(GameStates.VICTORY)
+        this.audio.playPowerUp()
+      }
+    }
   }
 }
