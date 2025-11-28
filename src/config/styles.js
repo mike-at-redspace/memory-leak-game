@@ -132,7 +132,7 @@ export const HudConfig = Object.freeze({
 export const ScreenConfig = Object.freeze({
   TargetFrameRate: 60,
   FrameInterval: 1000 / 60,
-  LargeScreenThreshold: 1600,
+  LargeScreenThreshold: 1920,
   BaseScale: 1.0,
   LargeScale: 1.5
 })

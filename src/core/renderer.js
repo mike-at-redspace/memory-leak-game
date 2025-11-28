@@ -146,9 +146,15 @@ export class Renderer {
    * @returns {number}
    */
   get scaleFactor() {
-    return this._canvas.width > ScreenConfig.LargeScreenThreshold
-      ? ScreenConfig.LargeScale
-      : ScreenConfig.BaseScale
+    const width = this._canvas.width
+    if (width > ScreenConfig.LargeScreenThreshold) {
+      // Scale proportionally for screens over 1920px (reduced scaling)
+      // At 1920px: 1.5x, at 2560px: ~1.75x, at 3840px: ~2.25x
+      const extraWidth = width - ScreenConfig.LargeScreenThreshold
+      const scaleMultiplier = 1 + (extraWidth / ScreenConfig.LargeScreenThreshold) * 0.5
+      return ScreenConfig.LargeScale * scaleMultiplier
+    }
+    return ScreenConfig.BaseScale
   }
 
   /**
@@ -197,7 +203,8 @@ export class Renderer {
       isMuted,
       width,
       height,
-      this.scaleFactor
+      this.scaleFactor,
+      currentLevel
     )
   }
 

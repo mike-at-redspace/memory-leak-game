@@ -49,10 +49,11 @@ export class HudRenderer {
    * @param {number}  width    - Current canvas width.
    * @param {number}  height   - Current canvas height.
    * @param {number}  scale    - UI scaling factor based on screen size.
+   * @param {number}  level    - Current level number.
    * @returns {void}
    */
-  render(stats, hud, isMuted, width, height, scale) {
-    this._drawScorePanel(stats, scale)
+  render(stats, hud, isMuted, width, height, scale, level = 1) {
+    this._drawScorePanel(stats, scale, level)
     this._drawInventoryPanel(hud, width, scale)
     this._drawMemoryBar(stats.playerHealth, width, height, scale)
     this._drawMuteButton(isMuted, height, scale)
@@ -63,17 +64,18 @@ export class HudRenderer {
   }
 
   /**
-   * Renders the top-left status panel (Score & Fragments).
+   * Renders the top-left status panel (Score, Fragments & Level).
    *
    * @access private
    */
-  _drawScorePanel(stats, scale) {
+  _drawScorePanel(stats, scale, level) {
     const layout = this._layout
+    // Increase panel height slightly to accommodate level display
     const panel = {
       x: layout.outerMargin,
       y: layout.outerMargin,
       w: layout.sidePanelWidth * scale,
-      h: layout.sidePanelHeight * scale
+      h: (layout.sidePanelHeight + 30) * scale
     }
 
     this._drawRoundedRect(
@@ -103,6 +105,7 @@ export class HudRenderer {
     this._ctx.textAlign = 'right'
 
     const rightEdge = panel.x + panel.w - layout.innerPadding * scale
+    const levelY = panel.y + layout.fragmentsY * scale + 30 * scale
 
     this._ctx.fillText(
       stats.score,
@@ -113,6 +116,11 @@ export class HudRenderer {
       `${stats.uniqueFound}/${this._targetItems.length}`,
       rightEdge,
       panel.y + layout.fragmentsY * scale
+    )
+    this._ctx.fillText(
+      `LEVEL ${level}`,
+      rightEdge,
+      levelY
     )
 
     // Labels
@@ -128,6 +136,7 @@ export class HudRenderer {
       leftEdge,
       panel.y + layout.fragmentsY * scale
     )
+    this._ctx.fillText('LEVEL', leftEdge, levelY)
   }
 
   /**
