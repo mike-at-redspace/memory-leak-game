@@ -115,6 +115,15 @@ export class AudioController {
   }
 
   /**
+   * Stops the background music playback.
+   *
+   * @returns {void}
+   */
+  stopMusic() {
+    this._stopMusic()
+  }
+
+  /**
    * Fetches, decodes, and loops the background music for a specific level.
    *
    * @param {number} [level=1] - The level number (1-5). Defaults to 1.

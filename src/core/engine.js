@@ -332,6 +332,8 @@ export class GameEngine {
       case GameStates.GAMEOVER:
       case GameStates.VICTORY:
         this.resetGame()
+        // Restart music for the current level (level 1 after reset)
+        this.audio.startMusic(this.stats.level)
         this._transitionState(GameStates.PLAYING)
         break
     }
@@ -505,6 +507,7 @@ export class GameEngine {
   _checkGameStateTransitions() {
     if (this.stats.playerHealth <= 0) {
       this._transitionState(GameStates.GAMEOVER)
+      this.audio.stopMusic()
       this.audio.playDamage()
     } else if (this.collectedUniqueIds.size >= TARGET_ITEMS.length) {
       if (this.stats.level < 5) {
@@ -558,11 +561,8 @@ export class GameEngine {
     this.hud.collectedIds.clear()
     this.hud.collectedPulseTimers.clear()
 
-    // Heal player slightly on level up
-    this.stats.playerHealth = Math.min(
-      this.stats.playerHealth + 100,
-      StatsConfig.MaxHealth
-    )
+    // Fully restore health on level up
+    this.stats.playerHealth = StatsConfig.MaxHealth
 
     const spawn = this.world.findSpawn()
     this.player.reset(spawn)
