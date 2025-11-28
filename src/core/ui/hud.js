@@ -318,18 +318,25 @@ export class HudRenderer {
   _drawStatusMessage(hud, canvasWidth, canvasHeight, scale) {
     const layout = this._layout
     const alpha = Math.min(1, hud.messageTimer / HudConfig.messageFadeDuration)
+    const x = canvasWidth / 2
+    const y = canvasHeight - layout.messageBottomMargin * scale
 
     this._ctx.save()
     this._ctx.globalAlpha = alpha
     this._ctx.textAlign = 'center'
+    this._ctx.textBaseline = 'middle'
     this._ctx.font = `700 ${layout.messageFontSize * scale}px ${this._fonts.Primary}`
-    this._ctx.fillStyle = hud.messageColor
 
-    this._ctx.fillText(
-      hud.lastMessage,
-      canvasWidth / 2,
-      canvasHeight - layout.messageBottomMargin * scale
-    )
+    // Draw thick outline for readability on any background
+    this._ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)'
+    this._ctx.lineWidth = 6 * scale
+    this._ctx.lineJoin = 'round'
+    this._ctx.miterLimit = 2
+    this._ctx.strokeText(hud.lastMessage, x, y)
+
+    // Draw the filled text on top
+    this._ctx.fillStyle = hud.messageColor
+    this._ctx.fillText(hud.lastMessage, x, y)
     this._ctx.restore()
   }
 
