@@ -105,4 +105,12 @@ Centralized configuration for maintainable gameplay logic:
 
 ## Credits
 
-- Background music licensed via [Pixabay - moodmode](https://pixabay.com/users/moodmode-33139253/).
+### Music
+
+Music by [Ievgen Poltavskyi](https://pixabay.com/users/hitslab-47305729/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=396890) from [Pixabay](https://pixabay.com/music//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=396890)
+
+Music by [inono777](https://pixabay.com/users/inono777-52141374/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=399898) from [Pixabay](https://pixabay.com/music//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=399898)
+
+Music by [Geoff Harvey](https://pixabay.com/users/geoffharvey-9096471/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=427889) from [Pixabay](https://pixabay.com/music//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=427889)
+
+Music by [NoCopyrightSound633](https://pixabay.com/users/nocopyrightsound633-47610058/?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=323176) from [Pixabay](https://pixabay.com//?utm_source=link-attribution&utm_medium=referral&utm_campaign=music&utm_content=323176)

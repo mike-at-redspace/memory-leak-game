@@ -40,12 +40,12 @@ export const ItemOutlineColors = Object.freeze({
 })
 
 export const LevelThemes = [
-  // Level 1: Standard Office
+  // Level 1: The Cloud
   {
-    Wall: 'color(display-p3 0.42 0.45 0.48)', // Slate Gray P3 (Base)
-    WallShadow: 'color(display-p3 0.25 0.27 0.29)', // Darker slate
-    Floor: 'color(display-p3 0.12 0.25 0.48)', // Darker corporate blue
-    FloorGrid: 'color(display-p3 0.22 0.50 0.95)' // Corporate Blue P3 (Accent)
+    Wall: 'color(display-p3 0.97 0.98 1.00)', // Soft White P3 (Base)
+    WallShadow: 'color(display-p3 0.75 0.78 0.80)', // Light gray
+    Floor: 'color(display-p3 0.50 0.70 0.85)', // Medium sky blue
+    FloorGrid: 'color(display-p3 0.25 0.75 1.00)' // Sky Blue P3 (Accent)
   },
   // Level 2: Startup
   {
@@ -68,12 +68,12 @@ export const LevelThemes = [
     Floor: 'color(display-p3 0.02 0.03 0.05)', // Slightly lighter near-black
     FloorGrid: 'color(display-p3 0.10 0.95 0.40)' // Neon Green P3 (Accent)
   },
-  // Level 5: The Cloud
+  // Level 5: Standard Office
   {
-    Wall: 'color(display-p3 0.97 0.98 1.00)', // Soft White P3 (Base)
-    WallShadow: 'color(display-p3 0.75 0.78 0.80)', // Light gray
-    Floor: 'color(display-p3 0.50 0.70 0.85)', // Medium sky blue
-    FloorGrid: 'color(display-p3 0.25 0.75 1.00)' // Sky Blue P3 (Accent)
+    Wall: 'color(display-p3 0.42 0.45 0.48)', // Slate Gray P3 (Base)
+    WallShadow: 'color(display-p3 0.25 0.27 0.29)', // Darker slate
+    Floor: 'color(display-p3 0.12 0.25 0.48)', // Darker corporate blue
+    FloorGrid: 'color(display-p3 0.22 0.50 0.95)' // Corporate Blue P3 (Accent)
   }
 ]
 

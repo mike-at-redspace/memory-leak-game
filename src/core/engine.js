@@ -325,8 +325,8 @@ export class GameEngine {
     switch (this.state) {
       case GameStates.START:
         this.audio.initialize()
-        this.audio.startMusic()
         this.resetGame()
+        this.audio.startMusic(this.stats.level)
         this._transitionState(GameStates.PLAYING)
         break
       case GameStates.GAMEOVER:
@@ -568,6 +568,9 @@ export class GameEngine {
     this.player.reset(spawn)
     this.camera.x = spawn.x - this.window.innerWidth / 2
     this.camera.y = spawn.y - this.window.innerHeight / 2
+
+    // Change music to match new level
+    this.audio.changeMusicForLevel(this.stats.level)
 
     this.particles.spawn(spawn.x, spawn.y, `LEVEL ${this.stats.level}`, 'boost')
     this.audio.playPowerUp()
