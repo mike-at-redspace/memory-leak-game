@@ -21,6 +21,7 @@ const PROC_GEN = ProcGenConfig
 export class World {
   constructor() {
     this._collectedItems = new Set()
+    this._levelSeed = 0
 
     // Pre-calculate total rarity weight to avoid re-looping every frame
     this._totalItemRarity = ITEM_REGISTRY.reduce(
@@ -32,12 +33,17 @@ export class World {
   }
 
   /**
-   * Resets the world state by clearing all collected items.
+   * Resets the world state and regenerates the map and items for a new level.
    *
+   * @param {number} [level=1] - The current level number (used for seed variation).
    * @returns {void}
    */
-  reset() {
+  reset(level = 1) {
     this._collectedItems.clear()
+    this._levelSeed = level
+    // Regenerate guaranteed items for the new level
+    this._guaranteedItemTiles.clear()
+    this._populateGuaranteedItems()
   }
 
   /**
@@ -49,7 +55,8 @@ export class World {
    * @returns {{ r: boolean; d: boolean }} Connectivity flags.
    */
   getCellConfig(cx, cy) {
-    const seed = (cx * PROC_GEN.Primes.X) ^ (cy * PROC_GEN.Primes.Y)
+    // Add level seed to vary map layout per level
+    const seed = (cx * PROC_GEN.Primes.X) ^ (cy * PROC_GEN.Primes.Y) ^ (this._levelSeed * 1000003)
     const r = seededRandom(seed)
 
     if (r < PROC_GEN.ConnectionThresholds.One) return { r: true, d: false }
@@ -116,7 +123,8 @@ export class World {
     const guaranteedItem = this._guaranteedItemTiles.get(key)
     if (guaranteedItem) return guaranteedItem
 
-    const seed = (tx * PROC_GEN.ItemSeed.X) ^ (ty * PROC_GEN.ItemSeed.Y)
+    // Add level seed to vary item spawns per level
+    const seed = (tx * PROC_GEN.ItemSeed.X) ^ (ty * PROC_GEN.ItemSeed.Y) ^ (this._levelSeed * 2000003)
     if (seededRandom(seed) > PROC_GEN.SpawnChance) return null
 
     const roll = seededRandom(seed + 1)
@@ -132,7 +140,8 @@ export class World {
 
   /**
    * Prepares a fixed mapping from tiles to required collectibles so every
-   * target item is present at least once in the world.
+   * target item is present at least once in the world. Uses level seed to
+   * vary placement each level.
    *
    * @returns {void}
    * @access private
@@ -149,10 +158,30 @@ export class World {
       candidateTiles = this._collectFloorTiles(required, limit)
     }
 
-    candidateTiles.slice(0, required).forEach((tile, index) => {
+    // Shuffle candidate tiles using level seed to vary placement each level
+    const shuffledTiles = this._shuffleWithSeed(candidateTiles, this._levelSeed)
+
+    shuffledTiles.slice(0, required).forEach((tile, index) => {
       const key = `${tile.tx},${tile.ty}`
       this._guaranteedItemTiles.set(key, TARGET_ITEMS[index])
     })
+  }
+
+  /**
+   * Shuffles an array using a seed for deterministic randomization.
+   *
+   * @param {Array} array - The array to shuffle.
+   * @param {number} seed - The seed value for randomization.
+   * @returns {Array} A new shuffled array.
+   * @access private
+   */
+  _shuffleWithSeed(array, seed) {
+    const shuffled = [...array]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(seededRandom((seed * 1000007) + i) * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    return shuffled
   }
 
   /**

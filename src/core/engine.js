@@ -537,10 +537,11 @@ export class GameEngine {
    * - @returns {void}
    */
   resetGame() {
-    this.world.reset()
     this.stats = this._createInitialStats()
     this.hud = this._createInitialHud()
     this.collectedUniqueIds.clear()
+    // Reset world with level 1 to regenerate map and items
+    this.world.reset(this.stats.level)
 
     const spawn = this.world.findSpawn()
     this.player.reset(spawn)
@@ -556,7 +557,8 @@ export class GameEngine {
    */
   _advanceLevel() {
     this.stats.level++
-    this.world.reset()
+    // Reset world with new level to regenerate map and items
+    this.world.reset(this.stats.level)
     this.collectedUniqueIds.clear()
     this.hud.collectedIds.clear()
     this.hud.collectedPulseTimers.clear()
