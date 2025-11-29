@@ -426,6 +426,9 @@ export class Renderer {
    * Designed for dev FLOW STATE: smooth sine waves, golden ratio, no jitter.
    */
   _drawPlayer(player, camera) {
+    const ctx = this._ctx
+    const now = performance.now() / 1000
+
     const px = Math.round(player.x - camera.x)
     const py = Math.round(player.y - camera.y)
     const w = SpriteConfig.Width * SpriteConfig.Scale
@@ -433,257 +436,237 @@ export class Renderer {
     const cx = px + w / 2
     const cy = py + h / 2
 
-    this._ctx.save()
-    const now = performance.now() / 1000
     const isBoosted = !!player.isBoosted
     const isSlowed = !!player.isSlowed
 
-    // ────────────────────────────────
-    //         BOOST EFFECT – SUPERNOVA
-    // ────────────────────────────────
-    if (isBoosted) {
-      const boostTime = player.boostStartTime
-        ? now - player.boostStartTime
-        : 999
-      const intensity = boostTime < 0.4 ? boostTime * 2.5 : 1
-      const pulse = Math.sin(now * 12) * 0.5 + 0.5
-      const fastPulse = Math.sin(now * 28) * 0.5 + 0.5
+    // Smooth intensity
+    const boostAge = now - (player.boostStartTime || 0)
+    const boostIntensity = isBoosted
+      ? Math.min(1, boostAge < 1.2 ? boostAge / 1.2 : 1)
+      : Math.max(0, 1 - (now - (player.boostEndTime || 0)) / 0.7)
 
-      // Shockwave on activation
-      if (boostTime < 1.2) {
-        const shockRadius = boostTime * 180
-        const shockAlpha = (1 - boostTime * 0.8) * 0.8
-        const grad = this._ctx.createRadialGradient(
+    const slowIntensity = isSlowed
+      ? 1
+      : Math.max(0, 1 - (now - (player.slowEndTime || 0)) / 0.8)
+
+    ctx.save()
+
+    // ──────────────────────────────
+    // 1. UNDER EFFECTS (rings, sparks, shockwave, frost)
+    // ──────────────────────────────
+    if (boostIntensity > 0.02) {
+      const pulse = (Math.sin(now * 5) + 1) / 2
+      const fastPulse = (Math.sin(now * 11) + 1) / 2
+
+      // Shockwave
+      if (boostAge > 0 && boostAge < 1.1) {
+        const prog = boostAge / 1.1
+        const radius = prog * 180
+        const grad = ctx.createRadialGradient(
           cx,
           cy,
-          shockRadius - 15,
+          radius - 20,
           cx,
           cy,
-          shockRadius + 10
+          radius + 10
         )
-        grad.addColorStop(0, `color(display-p3 0.5 1 1 / ${shockAlpha})`)
-        grad.addColorStop(1, `color(display-p3 0.2 0.9 1 / 0)`)
-        this._ctx.strokeStyle = grad
-        this._ctx.lineWidth = 10
-        this._ctx.globalAlpha = shockAlpha
-        this._ctx.beginPath()
-        this._ctx.arc(cx, cy, shockRadius, 0, Math.PI * 2)
-        this._ctx.stroke()
+        grad.addColorStop(
+          0,
+          `color(display-p3 0.4 1.1 1.5 / ${(1 - prog) * 0.8})`
+        )
+        grad.addColorStop(1, `color(display-p3 0.1 0.9 1.2 / 0)`)
+        ctx.strokeStyle = grad
+        ctx.lineWidth = 8
+        ctx.globalAlpha = 0.85 * boostIntensity
+        ctx.beginPath()
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
+        ctx.stroke()
       }
 
-      // Speed lines (directional)
-      if (player.velocity && (player.velocity.x || player.velocity.y)) {
-        const speed = Math.hypot(player.velocity.x, player.velocity.y)
-        const dir = Math.atan2(player.velocity.y, player.velocity.x)
-        const normSpeed = Math.min(1, speed / 300)
-
-        for (let i = 0; i < 9; i++) {
-          const offset = (i - 4.5) * 10
-          const len = 60 + normSpeed * 120
-          const alpha = normSpeed * (0.5 + fastPulse * 0.5)
-
-          const grad = this._ctx.createLinearGradient(
-            cx,
-            cy,
-            cx + Math.cos(dir + Math.PI) * len,
-            cy + Math.sin(dir + Math.PI) * len
-          )
-          grad.addColorStop(0, `color(display-p3 0.4 1 1 / ${alpha})`)
-          grad.addColorStop(1, `color(display-p3 0.1 0.9 1 / 0)`)
-
-          this._ctx.strokeStyle = grad
-          this._ctx.lineWidth = 3 + normSpeed * 5
-          this._ctx.globalAlpha = alpha
-          this._ctx.beginPath()
-          this._ctx.moveTo(
-            cx + offset * Math.cos(dir + Math.PI / 2),
-            cy + offset * Math.sin(dir + Math.PI / 2)
-          )
-          this._ctx.lineTo(
-            cx +
-              Math.cos(dir + Math.PI) * len +
-              offset * Math.cos(dir + Math.PI / 2),
-            cy +
-              Math.sin(dir + Math.PI) * len +
-              offset * Math.sin(dir + Math.PI / 2)
-          )
-          this._ctx.stroke()
-        }
+      // Rotating energy rings (under player)
+      ctx.save()
+      ctx.translate(cx, cy)
+      const rot = now * 1.2
+      for (let i = 0; i < 3; i++) {
+        ctx.rotate(rot * (0.7 + i * 0.4))
+        const r = 28 + i * 22 + pulse * 16
+        ctx.strokeStyle = `color(display-p3 ${0.25 + i * 0.12} ${0.95 + i * 0.05} 1.4 / ${0.5 + pulse * 0.3})`
+        ctx.lineWidth = 3.5
+        ctx.shadowBlur = 18
+        ctx.shadowColor = `color(display-p3 0.3 1 1.5)`
+        ctx.globalAlpha = (0.5 + i * 0.15) * boostIntensity
+        ctx.beginPath()
+        ctx.arc(0, 0, r, 0, Math.PI * 2)
+        ctx.stroke()
       }
+      ctx.restore()
 
-      // Core electric aura
-      const aura = this._ctx.createRadialGradient(cx, cy, 0, cx, cy, 90)
-      aura.addColorStop(
-        0,
-        `color(display-p3 0.7 1 1 / ${0.9 + fastPulse * 0.1})`
-      )
-      aura.addColorStop(
-        0.5,
-        `color(display-p3 0.4 0.95 1 / ${0.5 + pulse * 0.4})`
-      )
-      aura.addColorStop(1, `color(display-p3 0.2 0.8 1 / 0)`)
-      this._ctx.globalAlpha = 0.8
-      this._ctx.shadowBlur = 35
-      this._ctx.shadowColor = 'color(display-p3 0.5 1 1)'
-      this._ctx.fillStyle = aura
-      this._ctx.fillRect(cx - 90, cy - 90, 180, 180)
-
-      // Orbiting sparks with trails
+      // Orbiting sparks (under)
       for (let i = 0; i < 12; i++) {
-        const angle = now * 4.5 + i * 0.52
-        const radius = 35 + Math.sin(now * 7 + i) * 18
-        const x = cx + Math.cos(angle) * radius
-        const y = cy + Math.sin(angle) * radius
+        const angle = now * 4 + i * 0.52
+        const radius = 40 + Math.sin(now * 7 + i) * 8
+        const sx = cx + Math.cos(angle) * radius
+        const sy = cy + Math.sin(angle) * radius
 
-        const tx = x + Math.cos(angle + Math.PI) * 20
-        const ty = y + Math.sin(angle + Math.PI) * 20
+        ctx.globalAlpha = 0.5 * boostIntensity
+        ctx.fillStyle = `color(display-p3 0.4 1 1.2)`
+        ctx.beginPath()
+        ctx.arc(
+          sx - Math.cos(angle) * 20,
+          sy - Math.sin(angle) * 20,
+          2,
+          0,
+          Math.PI * 2
+        )
+        ctx.fill()
 
-        // Spark
-        this._ctx.globalAlpha = 0.9 + fastPulse * 0.1
-        this._ctx.shadowBlur = 14
-        this._ctx.shadowColor = 'color(display-p3 0.6 1 1)'
-        this._ctx.fillStyle = 'color(display-p3 1 1 1)'
-        this._ctx.beginPath()
-        this._ctx.arc(x, y, 3, 0, Math.PI * 2)
-        this._ctx.fill()
-
-        // Trail
-        this._ctx.globalAlpha = 0.5
-        this._ctx.shadowBlur = 8
-        this._ctx.fillStyle = 'color(display-p3 0.4 1 1)'
-        this._ctx.beginPath()
-        this._ctx.arc(tx, ty, 2, 0, Math.PI * 2)
-        this._ctx.fill()
+        ctx.globalAlpha = 0.9 * boostIntensity
+        ctx.shadowBlur = 16
+        ctx.shadowColor = `color(display-p3 0.5 1.1 1.6)`
+        ctx.fillStyle = `color(display-p3 1 1.2 1.6)`
+        ctx.beginPath()
+        ctx.arc(sx, sy, 3 + fastPulse * 2.5, 0, Math.PI * 2)
+        ctx.fill()
       }
     }
 
-    // ────────────────────────────────
-    //         SLOW EFFECT – TIME FREEZE
-    // ────────────────────────────────
-    if (isSlowed) {
+    if (slowIntensity > 0.02) {
       const pulse = (Math.sin(now * 1.6) + 1) / 2
 
-      // Frost aura
-      const frost = this._ctx.createRadialGradient(cx, cy, 0, cx, cy, 100)
-      frost.addColorStop(
+      // Frost aura (under player)
+      const frostR = Math.max(w, h) * 1.4
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, frostR)
+      grad.addColorStop(
         0,
-        `color(display-p3 0.7 0.7 1 / ${0.7 + pulse * 0.3})`
+        `color(display-p3 0.75 0.9 1.7 / ${0.6 * slowIntensity})`
       )
-      frost.addColorStop(
+      grad.addColorStop(
         0.6,
-        `color(display-p3 0.5 0.5 1 / ${0.4 + pulse * 0.2})`
+        `color(display-p3 0.6 0.8 1.5 / ${0.3 * slowIntensity})`
       )
-      frost.addColorStop(1, `color(display-p3 0.4 0.4 1 / 0)`)
-      this._ctx.globalAlpha = 0.65
-      this._ctx.shadowBlur = 30
-      this._ctx.shadowColor = 'color(display-p3 0.8 0.7 1)'
-      this._ctx.fillStyle = frost
-      this._ctx.fillRect(cx - 100, cy - 100, 200, 200)
-
-      // Floating ice crystals
-      for (let i = 0; i < 11; i++) {
-        const angle = (i / 11) * Math.PI * 2 + now * 0.3
-        const dist = 40 + Math.abs(Math.sin(now * 1.8 + i)) * 30
-        const x = cx + Math.cos(angle) * dist
-        const y = cy + Math.sin(angle) * dist
-        const size = 4 + Math.random() * 2.5
-
-        this._ctx.save()
-        this._ctx.translate(x, y)
-        this._ctx.rotate(angle + now * 0.5)
-        this._ctx.globalAlpha = 0.6 + pulse * 0.4
-        this._ctx.shadowBlur = 10
-        this._ctx.shadowColor = 'color(display-p3 0.9 0.8 1)'
-        this._ctx.fillStyle = 'color(display-p3 0.85 0.85 1)'
-
-        this._ctx.beginPath()
-        for (let j = 0; j < 6; j++) {
-          const a = (j * Math.PI) / 3
-          const r = j % 2 ? size : size * 0.6
-          const px = Math.cos(a) * r
-          const py = Math.sin(a) * r
-          j === 0 ? this._ctx.moveTo(px, py) : this._ctx.lineTo(px, py)
-        }
-        this._ctx.closePath()
-        this._ctx.fill()
-        this._ctx.restore()
-      }
-
-      // Temporal ghost echoes
-      this._ctx.globalCompositeOperation = 'screen'
-      for (let i = 1; i <= 4; i++) {
-        const lag = i * 8
-        const alpha = (0.3 / i) * (0.7 + pulse * 0.3)
-        const scale = 1 + Math.sin(now * 4 + i) * 0.06
-
-        this._ctx.save()
-        this._ctx.globalAlpha = alpha
-        this._ctx.filter = `blur(${2 + i}px)`
-        this._ctx.translate(cx, cy)
-        this._ctx.scale(scale, scale)
-        this._ctx.drawImage(
-          this._sheet,
-          player.frame * SpriteConfig.Width,
-          (player.direction || 0) * SpriteConfig.Height,
-          SpriteConfig.Width,
-          SpriteConfig.Height,
-          -w / 2 - lag * 0.3,
-          -h / 2 - lag * 0.15,
-          w,
-          h
-        )
-        this._ctx.restore()
-      }
-      this._ctx.globalCompositeOperation = 'source-over'
-      this._ctx.filter = 'none'
+      grad.addColorStop(1, `color(display-p3 0.4 0.6 1.2 / 0)`)
+      ctx.globalAlpha = 0.55 * slowIntensity
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(cx, cy, frostR, 0, Math.PI * 2)
+      ctx.fill()
     }
 
-    // ─────── DRAW PLAYER SPRITE ───────
-    this._ctx.shadowBlur = 0
-    this._ctx.globalAlpha = 1
+    // ──────────────────────────────
+    // 2. PLAYER SPRITE (middle layer)
+    // ──────────────────────────────
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
 
-    if (this._sheet.complete && this._sheet.naturalWidth > 0) {
-      if (isBoosted) {
-        const scale = 1 + Math.sin(now * 22) * 0.07
-        this._ctx.save()
-        this._ctx.translate(cx, cy)
-        this._ctx.scale(scale, scale)
-        this._ctx.drawImage(
-          this._sheet,
-          player.frame * SpriteConfig.Width,
-          (player.direction || 0) * SpriteConfig.Height,
-          SpriteConfig.Width,
-          SpriteConfig.Height,
-          -w / 2,
-          -h / 2,
-          w,
-          h
-        )
-        this._ctx.restore()
-      } else {
-        this._ctx.drawImage(
-          this._sheet,
-          player.frame * SpriteConfig.Width,
-          (player.direction || 0) * SpriteConfig.Height,
-          SpriteConfig.Width,
-          SpriteConfig.Height,
-          px,
-          py,
-          w,
-          h
-        )
-      }
+    if (this._sheet.complete && this._sheet.naturalWidth) {
+      ctx.drawImage(
+        this._sheet,
+        player.frame * SpriteConfig.Width,
+        (player.direction || 0) * SpriteConfig.Height,
+        SpriteConfig.Width,
+        SpriteConfig.Height,
+        px,
+        py,
+        w,
+        h
+      )
     } else {
-      // Fallback rectangle
-      this._ctx.fillStyle = isBoosted
-        ? '#00ffff'
+      ctx.fillStyle = isBoosted
+        ? 'color(display-p3 0.3 1 1.4)'
         : isSlowed
-          ? '#bb88ff'
-          : '#ffffff'
-      this._ctx.fillRect(px, py, w, h)
+          ? 'color(display-p3 0.7 0.9 1.6)'
+          : 'white'
+      ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
     }
 
-    this._ctx.restore()
+    // ──────────────────────────────
+    // 3. SLOW TRAIL (ghost echoes behind player when slowed)
+    // ──────────────────────────────
+    if (isSlowed && slowIntensity > 0.1) {
+      ctx.globalAlpha = 0.25 * slowIntensity
+      ctx.shadowBlur = 20
+      ctx.shadowColor = `color(display-p3 0.7 0.9 1.8)`
+
+      for (let i = 1; i <= 4; i++) {
+        const lag = i * 6
+        const alpha = (1 - i / 5) * 0.2 * slowIntensity
+        ctx.globalAlpha = alpha
+        ctx.drawImage(
+          this._sheet,
+          player.frame * SpriteConfig.Width,
+          (player.direction || 0) * SpriteConfig.Height,
+          SpriteConfig.Width,
+          SpriteConfig.Height,
+          px - lag,
+          py - lag * 0.4,
+          w,
+          h
+        )
+      }
+    }
+
+    // ──────────────────────────────
+    // 4. ARROWS ONLY — ON TOP LAYER (final pass)
+    // ──────────────────────────────
+    ctx.shadowBlur = 0
+
+    // Boost: upward arrows on top
+    if (boostIntensity > 0.02) {
+      const pulse = (Math.sin(now * 5) + 1) / 2
+      for (let i = 0; i < 9; i++) {
+        const phase = (now * 2.7 + i * 0.5) % 2.5
+        const t = phase / 2.5
+        const y = cy + 45 - t * 140
+        const x = cx + Math.sin(now * 3.2 + i) * 25
+        const size = 9 + pulse * 6
+
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.globalAlpha = (1 - t) ** 1.2 * 0.92 * boostIntensity
+        ctx.fillStyle = `color(display-p3 0.4 1.1.6)`
+        ctx.shadowBlur = 16
+        ctx.shadowColor = `color(display-p3 0.3 1.2 1.8)`
+
+        ctx.beginPath()
+        ctx.moveTo(0, -size)
+        ctx.lineTo(size * 0.7, size * 0.4)
+        ctx.lineTo(-size * 0.7, size * 0.4)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillRect(-size * 0.3, size * 0.4, size * 0.6, size * 1)
+        ctx.restore()
+      }
+    }
+
+    // Slow: downward arrows on top
+    if (slowIntensity > 0.02) {
+      const pulse = (Math.sin(now * 1.6) + 1) / 2
+      for (let i = 0; i < 10; i++) {
+        const phase = (now * 1.9 + i * 0.42) % 2.7
+        const t = phase / 2.7
+        const y = cy - 50 + t * 150
+        const x = cx + Math.cos(now * 2.3 + i) * 28
+        const size = 10 + pulse * 5
+
+        ctx.save()
+        ctx.translate(x, y)
+        ctx.globalAlpha = (1 - t) ** 1.4 * 0.9 * slowIntensity
+        ctx.fillStyle = `color(display-p3 0.85 0.95 1.8)`
+        ctx.shadowBlur = 18
+        ctx.shadowColor = `color(display-p3 0.7 0.9 2.0)`
+
+        ctx.beginPath()
+        ctx.moveTo(0, size * 1.1)
+        ctx.lineTo(size * 0.7, -size * 0.4)
+        ctx.lineTo(-size * 0.7, -size * 0.4)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillRect(-size * 0.3, -size * 0.95, size * 0.6, size * 0.9)
+        ctx.restore()
+      }
+    }
+
+    ctx.restore()
   }
 
   /**
