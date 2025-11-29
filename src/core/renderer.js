@@ -107,7 +107,11 @@ export class Renderer {
     this._document = options.documentRef || defaultDocument
 
     // Optimize context for 2D pixel art (alpha: false if background is opaque)
-    this._ctx = canvas.getContext('2d', { alpha: false })
+    this._ctx = canvas.getContext('2d', {
+      alpha: false,
+      desynchronized: true,
+      willReadFrequently: false
+    })
 
     this._sheet = new Image()
     this._sheet.src = SpriteConfig.Source
@@ -430,147 +434,220 @@ export class Renderer {
     const cy = py + h / 2
 
     this._ctx.save()
-
-    const now = performance.now() / 1000 // Normalized time for smooth anim
+    const now = performance.now() / 1000
     const isBoosted = !!player.isBoosted
     const isSlowed = !!player.isSlowed
 
-    // ─── FLOW-STATE BOOST: ROTATING AURA RINGS + ORBITING SPARKS + VELOCITY TRAIL ───
+    // ────────────────────────────────
+    //         BOOST EFFECT – SUPERNOVA
+    // ────────────────────────────────
     if (isBoosted) {
-      const pulse = (Math.sin(now * 3) + 1) / 2 // 0→1 smooth pulse (3Hz)
-      const rotation = now * 0.5 // Slow hypnotic rotation
-      const numRings = 4
-      const baseRadius = 20
+      const boostTime = player.boostStartTime
+        ? now - player.boostStartTime
+        : 999
+      const intensity = boostTime < 0.4 ? boostTime * 2.5 : 1
+      const pulse = Math.sin(now * 12) * 0.5 + 0.5
+      const fastPulse = Math.sin(now * 28) * 0.5 + 0.5
 
-      // === LAYERED ROTATING RINGS (Golden ratio spacing for harmony) ===
-      const phi = 0.618 // Golden ratio for perfect visual flow
-      for (let i = 0; i < numRings; i++) {
-        const ringProgress = i / numRings
-        const radius = baseRadius + ringProgress * 35 * (0.8 + pulse * 0.4)
-        const thickness = 3 + ringProgress * 2
-        const alpha = 0.4 + ringProgress * 0.2 * pulse
-        const hueShift = ringProgress * 120 // Cyan → Blue → Purple cycle
-
-        this._ctx.save()
-        this._ctx.translate(cx, cy)
-        this._ctx.rotate(rotation + ringProgress * Math.PI * 2 * phi)
-
-        // Gradient stroke for depth
-        const gradient = this._ctx.createLinearGradient(-radius, 0, radius, 0)
-        gradient.addColorStop(0, `hsla(${hueShift}, 100%, 70%, ${alpha})`)
-        gradient.addColorStop(
-          0.5,
-          `hsla(${hueShift + 60}, 100%, 80%, ${alpha * 1.5})`
+      // Shockwave on activation
+      if (boostTime < 1.2) {
+        const shockRadius = boostTime * 180
+        const shockAlpha = (1 - boostTime * 0.8) * 0.8
+        const grad = this._ctx.createRadialGradient(
+          cx,
+          cy,
+          shockRadius - 15,
+          cx,
+          cy,
+          shockRadius + 10
         )
-        gradient.addColorStop(1, `hsla(${hueShift}, 100%, 60%, ${alpha})`)
-
-        this._ctx.strokeStyle = gradient
-        this._ctx.lineWidth = thickness
-        this._ctx.lineCap = 'round'
-        this._ctx.globalAlpha = alpha
+        grad.addColorStop(0, `color(display-p3 0.5 1 1 / ${shockAlpha})`)
+        grad.addColorStop(1, `color(display-p3 0.2 0.9 1 / 0)`)
+        this._ctx.strokeStyle = grad
+        this._ctx.lineWidth = 10
+        this._ctx.globalAlpha = shockAlpha
         this._ctx.beginPath()
-        this._ctx.arc(0, 0, radius, 0, Math.PI * 2)
+        this._ctx.arc(cx, cy, shockRadius, 0, Math.PI * 2)
         this._ctx.stroke()
-        this._ctx.restore()
       }
 
-      // === 12 ORBITING SPARKS (Sine bob + radial emit) ===
-      const numSparks = 12
-      for (let i = 0; i < numSparks; i++) {
-        const angle =
-          (now * 2 + (i * Math.PI * 2) / numSparks) * (1 + pulse * 0.3)
-        const sparkRadius = baseRadius + 15 + Math.sin(now * 5 + i) * 3
-        const bob = Math.sin(now * 4 + i * phi * 10) * 2
+      // Speed lines (directional)
+      if (player.velocity && (player.velocity.x || player.velocity.y)) {
+        const speed = Math.hypot(player.velocity.x, player.velocity.y)
+        const dir = Math.atan2(player.velocity.y, player.velocity.x)
+        const normSpeed = Math.min(1, speed / 300)
 
-        const sx = cx + Math.cos(angle) * sparkRadius
-        const sy = cy + Math.sin(angle) * sparkRadius + bob
+        for (let i = 0; i < 9; i++) {
+          const offset = (i - 4.5) * 10
+          const len = 60 + normSpeed * 120
+          const alpha = normSpeed * (0.5 + fastPulse * 0.5)
 
-        // Spark glow (multi-layer for bloom)
-        for (let blur = 8; blur >= 0; blur -= 2) {
-          this._ctx.shadowBlur = blur
-          this._ctx.shadowColor = `hsl(${240 + pulse * 60}, 100%, 70%)`
-          this._ctx.globalAlpha = ((10 - blur) / 20) * pulse
+          const grad = this._ctx.createLinearGradient(
+            cx,
+            cy,
+            cx + Math.cos(dir + Math.PI) * len,
+            cy + Math.sin(dir + Math.PI) * len
+          )
+          grad.addColorStop(0, `color(display-p3 0.4 1 1 / ${alpha})`)
+          grad.addColorStop(1, `color(display-p3 0.1 0.9 1 / 0)`)
+
+          this._ctx.strokeStyle = grad
+          this._ctx.lineWidth = 3 + normSpeed * 5
+          this._ctx.globalAlpha = alpha
           this._ctx.beginPath()
-          this._ctx.arc(sx, sy, 3 + pulse * 2, 0, Math.PI * 2)
-          this._ctx.fillStyle = '#ffffff'
-          this._ctx.fill()
+          this._ctx.moveTo(
+            cx + offset * Math.cos(dir + Math.PI / 2),
+            cy + offset * Math.sin(dir + Math.PI / 2)
+          )
+          this._ctx.lineTo(
+            cx +
+              Math.cos(dir + Math.PI) * len +
+              offset * Math.cos(dir + Math.PI / 2),
+            cy +
+              Math.sin(dir + Math.PI) * len +
+              offset * Math.sin(dir + Math.PI / 2)
+          )
+          this._ctx.stroke()
         }
       }
 
-      // === VELOCITY-BASED ENERGY TRAIL (Behind player, flows with motion) ===
-      if (
-        player.velocity &&
-        (player.velocity.x !== 0 || player.velocity.y !== 0)
-      ) {
-        const velMag = Math.min(
-          1,
-          Math.sqrt(player.velocity.x ** 2 + player.velocity.y ** 2) / 200
-        )
-        const trailAngle =
-          Math.atan2(player.velocity.y, player.velocity.x) + Math.PI // Opposite direction
-        const trailLength = 60 * velMag * (1 + pulse)
+      // Core electric aura
+      const aura = this._ctx.createRadialGradient(cx, cy, 0, cx, cy, 90)
+      aura.addColorStop(
+        0,
+        `color(display-p3 0.7 1 1 / ${0.9 + fastPulse * 0.1})`
+      )
+      aura.addColorStop(
+        0.5,
+        `color(display-p3 0.4 0.95 1 / ${0.5 + pulse * 0.4})`
+      )
+      aura.addColorStop(1, `color(display-p3 0.2 0.8 1 / 0)`)
+      this._ctx.globalAlpha = 0.8
+      this._ctx.shadowBlur = 35
+      this._ctx.shadowColor = 'color(display-p3 0.5 1 1)'
+      this._ctx.fillStyle = aura
+      this._ctx.fillRect(cx - 90, cy - 90, 180, 180)
 
-        // Draw trail gradient
-        const trailGradient = this._ctx.createLinearGradient(
-          cx,
-          cy,
-          cx + Math.cos(trailAngle) * trailLength,
-          cy + Math.sin(trailAngle) * trailLength
-        )
-        trailGradient.addColorStop(0, `hsla(200, 100%, 50%, 0)`)
-        trailGradient.addColorStop(0.3, `hsla(180, 100%, 60%, ${pulse * 0.8})`)
-        trailGradient.addColorStop(1, `hsla(200, 100%, 80%, 0)`)
+      // Orbiting sparks with trails
+      for (let i = 0; i < 12; i++) {
+        const angle = now * 4.5 + i * 0.52
+        const radius = 35 + Math.sin(now * 7 + i) * 18
+        const x = cx + Math.cos(angle) * radius
+        const y = cy + Math.sin(angle) * radius
 
-        this._ctx.shadowBlur = 15 * pulse
-        this._ctx.shadowColor = '#00ffff'
-        this._ctx.strokeStyle = trailGradient
-        this._ctx.lineWidth = 8 * velMag
-        this._ctx.lineCap = 'round'
-        this._ctx.globalAlpha = pulse * 0.9
+        const tx = x + Math.cos(angle + Math.PI) * 20
+        const ty = y + Math.sin(angle + Math.PI) * 20
+
+        // Spark
+        this._ctx.globalAlpha = 0.9 + fastPulse * 0.1
+        this._ctx.shadowBlur = 14
+        this._ctx.shadowColor = 'color(display-p3 0.6 1 1)'
+        this._ctx.fillStyle = 'color(display-p3 1 1 1)'
         this._ctx.beginPath()
-        this._ctx.moveTo(cx, cy)
-        this._ctx.lineTo(
-          cx + Math.cos(trailAngle) * trailLength,
-          cy + Math.sin(trailAngle) * trailLength
-        )
-        this._ctx.stroke()
-      }
+        this._ctx.arc(x, y, 3, 0, Math.PI * 2)
+        this._ctx.fill()
 
-      this._ctx.globalAlpha = 1
+        // Trail
+        this._ctx.globalAlpha = 0.5
+        this._ctx.shadowBlur = 8
+        this._ctx.fillStyle = 'color(display-p3 0.4 1 1)'
+        this._ctx.beginPath()
+        this._ctx.arc(tx, ty, 2, 0, Math.PI * 2)
+        this._ctx.fill()
+      }
     }
 
-    // ─── SLOW EFFECT (unchanged - keeps contrast) ───
+    // ────────────────────────────────
+    //         SLOW EFFECT – TIME FREEZE
+    // ────────────────────────────────
     if (isSlowed) {
-      const pulse = Math.sin(now * 2)
-      this._ctx.shadowBlur = 25 + pulse * 20
-      this._ctx.shadowColor = '#9933ff'
+      const pulse = (Math.sin(now * 1.6) + 1) / 2
 
-      for (let i = 3; i >= 0; i--) {
-        this._ctx.globalAlpha = 0.15 * (4 - i)
+      // Frost aura
+      const frost = this._ctx.createRadialGradient(cx, cy, 0, cx, cy, 100)
+      frost.addColorStop(
+        0,
+        `color(display-p3 0.7 0.7 1 / ${0.7 + pulse * 0.3})`
+      )
+      frost.addColorStop(
+        0.6,
+        `color(display-p3 0.5 0.5 1 / ${0.4 + pulse * 0.2})`
+      )
+      frost.addColorStop(1, `color(display-p3 0.4 0.4 1 / 0)`)
+      this._ctx.globalAlpha = 0.65
+      this._ctx.shadowBlur = 30
+      this._ctx.shadowColor = 'color(display-p3 0.8 0.7 1)'
+      this._ctx.fillStyle = frost
+      this._ctx.fillRect(cx - 100, cy - 100, 200, 200)
+
+      // Floating ice crystals
+      for (let i = 0; i < 11; i++) {
+        const angle = (i / 11) * Math.PI * 2 + now * 0.3
+        const dist = 40 + Math.abs(Math.sin(now * 1.8 + i)) * 30
+        const x = cx + Math.cos(angle) * dist
+        const y = cy + Math.sin(angle) * dist
+        const size = 4 + Math.random() * 2.5
+
+        this._ctx.save()
+        this._ctx.translate(x, y)
+        this._ctx.rotate(angle + now * 0.5)
+        this._ctx.globalAlpha = 0.6 + pulse * 0.4
+        this._ctx.shadowBlur = 10
+        this._ctx.shadowColor = 'color(display-p3 0.9 0.8 1)'
+        this._ctx.fillStyle = 'color(display-p3 0.85 0.85 1)'
+
+        this._ctx.beginPath()
+        for (let j = 0; j < 6; j++) {
+          const a = (j * Math.PI) / 3
+          const r = j % 2 ? size : size * 0.6
+          const px = Math.cos(a) * r
+          const py = Math.sin(a) * r
+          j === 0 ? this._ctx.moveTo(px, py) : this._ctx.lineTo(px, py)
+        }
+        this._ctx.closePath()
+        this._ctx.fill()
+        this._ctx.restore()
+      }
+
+      // Temporal ghost echoes
+      this._ctx.globalCompositeOperation = 'screen'
+      for (let i = 1; i <= 4; i++) {
+        const lag = i * 8
+        const alpha = (0.3 / i) * (0.7 + pulse * 0.3)
+        const scale = 1 + Math.sin(now * 4 + i) * 0.06
+
+        this._ctx.save()
+        this._ctx.globalAlpha = alpha
+        this._ctx.filter = `blur(${2 + i}px)`
+        this._ctx.translate(cx, cy)
+        this._ctx.scale(scale, scale)
         this._ctx.drawImage(
           this._sheet,
           player.frame * SpriteConfig.Width,
           (player.direction || 0) * SpriteConfig.Height,
           SpriteConfig.Width,
           SpriteConfig.Height,
-          px + (i - 1.5) * 6,
-          py + (i - 1.5) * 3,
+          -w / 2 - lag * 0.3,
+          -h / 2 - lag * 0.15,
           w,
           h
         )
+        this._ctx.restore()
       }
-      this._ctx.globalAlpha = 1
+      this._ctx.globalCompositeOperation = 'source-over'
+      this._ctx.filter = 'none'
     }
 
-    // ─── CORE SPRITE (clean on top) ───
+    // ─────── DRAW PLAYER SPRITE ───────
     this._ctx.shadowBlur = 0
+    this._ctx.globalAlpha = 1
+
     if (this._sheet.complete && this._sheet.naturalWidth > 0) {
-      // Inner core pulse for boost
       if (isBoosted) {
-        const corePulse = 1 + Math.sin(now * 6) * 0.1
+        const scale = 1 + Math.sin(now * 22) * 0.07
         this._ctx.save()
         this._ctx.translate(cx, cy)
-        this._ctx.scale(corePulse, corePulse)
+        this._ctx.scale(scale, scale)
         this._ctx.drawImage(
           this._sheet,
           player.frame * SpriteConfig.Width,
@@ -597,7 +674,12 @@ export class Renderer {
         )
       }
     } else {
-      this._ctx.fillStyle = isBoosted ? '#00ffff' : '#ff00ff'
+      // Fallback rectangle
+      this._ctx.fillStyle = isBoosted
+        ? '#00ffff'
+        : isSlowed
+          ? '#bb88ff'
+          : '#ffffff'
       this._ctx.fillRect(px, py, w, h)
     }
 
