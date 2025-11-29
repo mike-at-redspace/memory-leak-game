@@ -175,6 +175,12 @@ export class GameEngine {
    *
    * @returns {void}
    */
+  /**
+   * Updates game logic, physics, and state transitions based on elapsed time.
+   *
+   * @param {number} dt  - Delta time in milliseconds since the last frame.
+   * @returns {void}
+   */
   update(dt) {
     const moveVec = this.input.getMovementVector()
     this.player.move(moveVec, this.world, dt)
@@ -191,7 +197,11 @@ export class GameEngine {
     this.camera.follow(playerCenterX, playerCenterY)
     this._checkCollisions(playerCenterX, playerCenterY)
 
-    this.stats.playerHealth -= (StatsConfig.MemoryLeakRate * dt) / 1000
+    // === BOOST IMMUNITY: No memory leak drain during boost ===
+    if (!this.player.isBoosted) {
+      this.stats.playerHealth -= (StatsConfig.MemoryLeakRate * dt) / 1000
+    }
+
     if (this.hud.messageTimer > 0) this.hud.messageTimer -= dt
     this._updateHudPulseTimers(dt)
     this.particles.update(dt)
@@ -377,17 +387,25 @@ export class GameEngine {
   }
 
   /**
-   * Applies health modifications from an item with level-based scaling.
-   *
-   * - @private.
+   * Applies health modifications from an item with level-based scaling + BOOST
+   * IMMUNITY.
    *
    * @param {Object} item  - The health item object.
    * @param {number} x     - World X position for particle effects.
    * @param {number} y     - World Y position for particle effects.
    * @returns {void}
+   * @access private
    */
   _handleHealthItem(item, x, y) {
     const isHeal = item.health > 0
+
+    // === BOOST IMMUNITY: Block damage items completely ===
+    if (!isHeal && this.player.isBoosted) {
+      this.particles.spawn(x, y, '🛡️ IMMUNE', 'boost')
+      this.audio.playPowerUp() // Positive sound for immunity
+      return // Skip damage application
+    }
+
     const multiplier = this._getHealthMultiplier(this.stats.level, isHeal)
     const adjustedHealth = this._roundToMultipleOf4(item.health * multiplier)
 
@@ -416,20 +434,37 @@ export class GameEngine {
    * @param {number} y     - World Y position for particle effects.
    * @returns {void}
    */
+  /**
+   * Applies speed modifications from an item + visual effect flags.
+   */
   _handleSpeedItem(item, x, y) {
     const isBoost = !!item.isBoost
+
+    // Apply speed multiplier
     this.player.multiplier = isBoost ? StatsConfig.SpeedBoostMultiplier : 0.5
 
-    if (this.player.speedTimer) clearTimeout(this.player.speedTimer)
+    // SET THE VISUAL FLAGS — THIS WAS MISSING!
+    this.player.isBoosted = isBoost
+    this.player.isSlowed = !isBoost
 
+    // Clear any existing timer
+    if (this.player.speedTimer) {
+      clearTimeout(this.player.speedTimer)
+      this.player.speedTimer = null
+    }
+
+    // Reset multiplier + visual flags when duration ends
     this.player.speedTimer = setTimeout(() => {
       this.player.multiplier = 1
+      this.player.isBoosted = false
+      this.player.isSlowed = false
       this.player.speedTimer = null
     }, StatsConfig.SpeedBoostDuration)
 
+    // Particles & sound
     this.particles.spawn(
-      x,
-      y,
+      x + PhysicsConfig.TileSize / 2,
+      y + PhysicsConfig.TileSize / 2,
       isBoost ? 'BOOST!' : 'LAG...',
       isBoost ? 'boost' : 'slow'
     )

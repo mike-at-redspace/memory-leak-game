@@ -117,11 +117,7 @@ export class HudRenderer {
       rightEdge,
       panel.y + layout.fragmentsY * scale
     )
-    this._ctx.fillText(
-      `LEVEL ${level}`,
-      rightEdge,
-      levelY
-    )
+    this._ctx.fillText(`LEVEL ${level}`, rightEdge, levelY)
 
     // Labels
     this._ctx.fillStyle = '#ccc'

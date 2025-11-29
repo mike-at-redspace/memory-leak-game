@@ -60,7 +60,7 @@ export const SpriteConfig = Object.freeze({
  */
 export const StatsConfig = Object.freeze({
   MaxHealth: 640,
-  SpeedBoostDuration: 3000,
+  SpeedBoostDuration: 4200,
   SpeedBoostMultiplier: 2.0,
   MemoryLeakRate: 8
 })

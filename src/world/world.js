@@ -35,7 +35,8 @@ export class World {
   /**
    * Resets the world state and regenerates the map and items for a new level.
    *
-   * @param {number} [level=1] - The current level number (used for seed variation).
+   * @param {number} [level=1]  - The current level number (used for seed
+   *                            variation).
    * @returns {void}
    */
   reset(level = 1) {
@@ -56,7 +57,10 @@ export class World {
    */
   getCellConfig(cx, cy) {
     // Add level seed to vary map layout per level
-    const seed = (cx * PROC_GEN.Primes.X) ^ (cy * PROC_GEN.Primes.Y) ^ (this._levelSeed * 1000003)
+    const seed =
+      (cx * PROC_GEN.Primes.X) ^
+      (cy * PROC_GEN.Primes.Y) ^
+      (this._levelSeed * 1000003)
     const r = seededRandom(seed)
 
     if (r < PROC_GEN.ConnectionThresholds.One) return { r: true, d: false }
@@ -124,7 +128,10 @@ export class World {
     if (guaranteedItem) return guaranteedItem
 
     // Add level seed to vary item spawns per level
-    const seed = (tx * PROC_GEN.ItemSeed.X) ^ (ty * PROC_GEN.ItemSeed.Y) ^ (this._levelSeed * 2000003)
+    const seed =
+      (tx * PROC_GEN.ItemSeed.X) ^
+      (ty * PROC_GEN.ItemSeed.Y) ^
+      (this._levelSeed * 2000003)
     if (seededRandom(seed) > PROC_GEN.SpawnChance) return null
 
     const roll = seededRandom(seed + 1)
@@ -140,8 +147,8 @@ export class World {
 
   /**
    * Prepares a fixed mapping from tiles to required collectibles so every
-   * target item is present at least once in the world. Uses level seed to
-   * vary placement each level.
+   * target item is present at least once in the world. Uses level seed to vary
+   * placement each level.
    *
    * @returns {void}
    * @access private
@@ -170,15 +177,15 @@ export class World {
   /**
    * Shuffles an array using a seed for deterministic randomization.
    *
-   * @param {Array} array - The array to shuffle.
-   * @param {number} seed - The seed value for randomization.
+   * @param {Array}  array  - The array to shuffle.
+   * @param {number} seed   - The seed value for randomization.
    * @returns {Array} A new shuffled array.
    * @access private
    */
   _shuffleWithSeed(array, seed) {
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(seededRandom((seed * 1000007) + i) * (i + 1))
+      const j = Math.floor(seededRandom(seed * 1000007 + i) * (i + 1))
       ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
     return shuffled

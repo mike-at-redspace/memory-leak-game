@@ -83,7 +83,7 @@ export class AudioController {
   /**
    * Gets the music URL for a specific level.
    *
-   * @param {number} level - The level number (1-5).
+   * @param {number} level  - The level number (1-5).
    * @returns {string} The music file path for the level.
    * @access private
    */
@@ -126,7 +126,7 @@ export class AudioController {
   /**
    * Fetches, decodes, and loops the background music for a specific level.
    *
-   * @param {number} [level=1] - The level number (1-5). Defaults to 1.
+   * @param {number} [level=1]  - The level number (1-5). Defaults to 1.
    * @returns {Promise<void>}
    * @async
    */
@@ -175,7 +175,7 @@ export class AudioController {
   /**
    * Changes the background music to match the specified level.
    *
-   * @param {number} level - The level number (1-5).
+   * @param {number} level  - The level number (1-5).
    * @returns {Promise<void>}
    * @async
    */
