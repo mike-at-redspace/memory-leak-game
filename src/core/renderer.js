@@ -410,20 +410,35 @@ export class Renderer {
     return null
   }
 
+  _drawArrow(ctx, x, y, size, color, alpha, direction = 1) {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.globalAlpha = alpha
+    ctx.fillStyle = color
+
+    // Triangle head
+    ctx.beginPath()
+    ctx.moveTo(0, -direction * size)
+    ctx.lineTo(size * 0.6, direction * size * 0.4)
+    ctx.lineTo(-size * 0.6, direction * size * 0.4)
+    ctx.closePath()
+    ctx.fill()
+
+    // Rect body
+    ctx.fillRect(
+      -size * 0.25,
+      direction * size * 0.4,
+      size * 0.5,
+      direction * size * 0.9
+    )
+
+    ctx.restore()
+  }
+
   /**
    * Draws the player sprite or fallback box.
    *
    * @access private
-   */
-  /**
-   * Draws the player sprite with visual effects during boost/slow.
-   *
-   * @access private
-   */
-  /**
-   * Draws the player with HYPER-FLOW BOOST ANIMATION.
-   * Mesmerizing rotating rings + orbiting sparks + velocity trails.
-   * Designed for dev FLOW STATE: smooth sine waves, golden ratio, no jitter.
    */
   _drawPlayer(player, camera) {
     const ctx = this._ctx
@@ -439,10 +454,10 @@ export class Renderer {
     const isBoosted = !!player.isBoosted
     const isSlowed = !!player.isSlowed
 
-    // Smooth intensity
+    // Smooth transitions
     const boostAge = now - (player.boostStartTime || 0)
     const boostIntensity = isBoosted
-      ? Math.min(1, boostAge < 1.2 ? boostAge / 1.2 : 1)
+      ? Math.min(1, boostAge / 1.2)
       : Math.max(0, 1 - (now - (player.boostEndTime || 0)) / 0.7)
 
     const slowIntensity = isSlowed
@@ -452,108 +467,7 @@ export class Renderer {
     ctx.save()
 
     // ──────────────────────────────
-    // 1. UNDER EFFECTS (rings, sparks, shockwave, frost)
-    // ──────────────────────────────
-    if (boostIntensity > 0.02) {
-      const pulse = (Math.sin(now * 5) + 1) / 2
-      const fastPulse = (Math.sin(now * 11) + 1) / 2
-
-      // Shockwave
-      if (boostAge > 0 && boostAge < 1.1) {
-        const prog = boostAge / 1.1
-        const radius = prog * 180
-        const grad = ctx.createRadialGradient(
-          cx,
-          cy,
-          radius - 20,
-          cx,
-          cy,
-          radius + 10
-        )
-        grad.addColorStop(
-          0,
-          `color(display-p3 0.4 1.1 1.5 / ${(1 - prog) * 0.8})`
-        )
-        grad.addColorStop(1, `color(display-p3 0.1 0.9 1.2 / 0)`)
-        ctx.strokeStyle = grad
-        ctx.lineWidth = 8
-        ctx.globalAlpha = 0.85 * boostIntensity
-        ctx.beginPath()
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-
-      // Rotating energy rings (under player)
-      ctx.save()
-      ctx.translate(cx, cy)
-      const rot = now * 1.2
-      for (let i = 0; i < 3; i++) {
-        ctx.rotate(rot * (0.7 + i * 0.4))
-        const r = 28 + i * 22 + pulse * 16
-        ctx.strokeStyle = `color(display-p3 ${0.25 + i * 0.12} ${0.95 + i * 0.05} 1.4 / ${0.5 + pulse * 0.3})`
-        ctx.lineWidth = 3.5
-        ctx.shadowBlur = 18
-        ctx.shadowColor = `color(display-p3 0.3 1 1.5)`
-        ctx.globalAlpha = (0.5 + i * 0.15) * boostIntensity
-        ctx.beginPath()
-        ctx.arc(0, 0, r, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-      ctx.restore()
-
-      // Orbiting sparks (under)
-      for (let i = 0; i < 12; i++) {
-        const angle = now * 4 + i * 0.52
-        const radius = 40 + Math.sin(now * 7 + i) * 8
-        const sx = cx + Math.cos(angle) * radius
-        const sy = cy + Math.sin(angle) * radius
-
-        ctx.globalAlpha = 0.5 * boostIntensity
-        ctx.fillStyle = `color(display-p3 0.4 1 1.2)`
-        ctx.beginPath()
-        ctx.arc(
-          sx - Math.cos(angle) * 20,
-          sy - Math.sin(angle) * 20,
-          2,
-          0,
-          Math.PI * 2
-        )
-        ctx.fill()
-
-        ctx.globalAlpha = 0.9 * boostIntensity
-        ctx.shadowBlur = 16
-        ctx.shadowColor = `color(display-p3 0.5 1.1 1.6)`
-        ctx.fillStyle = `color(display-p3 1 1.2 1.6)`
-        ctx.beginPath()
-        ctx.arc(sx, sy, 3 + fastPulse * 2.5, 0, Math.PI * 2)
-        ctx.fill()
-      }
-    }
-
-    if (slowIntensity > 0.02) {
-      const pulse = (Math.sin(now * 1.6) + 1) / 2
-
-      // Frost aura (under player)
-      const frostR = Math.max(w, h) * 1.4
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, frostR)
-      grad.addColorStop(
-        0,
-        `color(display-p3 0.75 0.9 1.7 / ${0.6 * slowIntensity})`
-      )
-      grad.addColorStop(
-        0.6,
-        `color(display-p3 0.6 0.8 1.5 / ${0.3 * slowIntensity})`
-      )
-      grad.addColorStop(1, `color(display-p3 0.4 0.6 1.2 / 0)`)
-      ctx.globalAlpha = 0.55 * slowIntensity
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.arc(cx, cy, frostR, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    // ──────────────────────────────
-    // 2. PLAYER SPRITE (middle layer)
+    // 1. PLAYER SPRITE
     // ──────────────────────────────
     ctx.globalAlpha = 1
     ctx.shadowBlur = 0
@@ -571,21 +485,17 @@ export class Renderer {
         h
       )
     } else {
-      ctx.fillStyle = isBoosted
-        ? 'color(display-p3 0.3 1 1.4)'
-        : isSlowed
-          ? 'color(display-p3 0.7 0.9 1.6)'
-          : 'white'
+      ctx.fillStyle = 'white'
       ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
     }
 
     // ──────────────────────────────
-    // 3. SLOW TRAIL (ghost echoes behind player when slowed)
+    // 2. SLOW LAG TRAIL (kept from your original)
     // ──────────────────────────────
     if (isSlowed && slowIntensity > 0.1) {
       ctx.globalAlpha = 0.25 * slowIntensity
       ctx.shadowBlur = 20
-      ctx.shadowColor = `color(display-p3 0.7 0.9 1.8)`
+      ctx.shadowColor = `color(display-p3 1 0.5 0.5)` // soft red glow
 
       for (let i = 1; i <= 4; i++) {
         const lag = i * 6
@@ -605,64 +515,94 @@ export class Renderer {
       }
     }
 
-    // ──────────────────────────────
-    // 4. ARROWS ONLY — ON TOP LAYER (final pass)
-    // ──────────────────────────────
-    ctx.shadowBlur = 0
+    if (isBoosted && boostIntensity > 0.05) {
+      // FORWARD AFTERIMAGES
+      ctx.shadowBlur = 25
+      ctx.shadowColor = `color(display-p3 0 1 1)` // cyan glow
 
-    // Boost: upward arrows on top
-    if (boostIntensity > 0.02) {
-      const pulse = (Math.sin(now * 5) + 1) / 2
-      for (let i = 0; i < 9; i++) {
-        const phase = (now * 2.7 + i * 0.5) % 2.5
-        const t = phase / 2.5
-        const y = cy + 45 - t * 140
-        const x = cx + Math.sin(now * 3.2 + i) * 25
-        const size = 9 + pulse * 6
+      for (let i = 1; i <= 3; i++) {
+        const lead = i * 5
+        const alpha = (1 - i / 3) * 0.22 * boostIntensity
 
-        ctx.save()
-        ctx.translate(x, y)
-        ctx.globalAlpha = (1 - t) ** 1.2 * 0.92 * boostIntensity
-        ctx.fillStyle = `color(display-p3 0.4 1.1.6)`
-        ctx.shadowBlur = 16
-        ctx.shadowColor = `color(display-p3 0.3 1.2 1.8)`
+        ctx.globalAlpha = alpha
+        ctx.drawImage(
+          this._sheet,
+          player.frame * SpriteConfig.Width,
+          (player.direction || 0) * SpriteConfig.Height,
+          SpriteConfig.Width,
+          SpriteConfig.Height,
+          px + lead,
+          py - lead * 0.25,
+          w,
+          h
+        )
+      }
+
+      // SPEED LINES (thin white streaks)
+      const lineCount = 3
+      ctx.lineWidth = 2
+      ctx.strokeStyle = `rgba(255,255,255,${0.35 * boostIntensity})`
+
+      for (let i = 0; i < lineCount; i++) {
+        const offsetX = (Math.random() - 0.5) * w * 0.4
+        const offsetY = (Math.random() - 0.5) * h * 0.25
 
         ctx.beginPath()
-        ctx.moveTo(0, -size)
-        ctx.lineTo(size * 0.7, size * 0.4)
-        ctx.lineTo(-size * 0.7, size * 0.4)
-        ctx.closePath()
-        ctx.fill()
-        ctx.fillRect(-size * 0.3, size * 0.4, size * 0.6, size * 1)
-        ctx.restore()
+        ctx.moveTo(cx + offsetX, cy + offsetY)
+        ctx.lineTo(
+          cx + offsetX - player.vx * 0.8,
+          cy + offsetY - player.vy * 0.8
+        )
+        ctx.stroke()
       }
     }
 
-    // Slow: downward arrows on top
+    // ──────────────────────────────
+    // 3. ARROWS — BOOST UP, SLOW DOWN
+    //    (restricted to top half of body)
+    // ──────────────────────────────
+
+    // BOOST — upward arrows (HDR green)
+    if (boostIntensity > 0.02) {
+      const color = `color(display-p3 0 1 0)` // HDR green
+      const pulse = (Math.sin(now * 4) + 1) / 2
+
+      for (let i = 0; i < 8; i++) {
+        const phase = (now * 2.5 + i * 0.35) % 1.8
+        const t = phase / 1.8
+
+        const size = w * 0.28 + pulse
+
+        const yStart = cy - h * 0.45 // forehead / upper face
+        const yEnd = cy - h * 0.9 // above the head
+        const y = yStart + (yEnd - yStart) * t
+
+        const x = cx + Math.sin(now * 3 + i) * (w * 0.15)
+        const alpha = (1 - t) ** 1.3 * boostIntensity * 0.9
+
+        this._drawArrow(ctx, x, y, size, color, alpha, 1)
+      }
+    }
+
+    // SLOW — downward arrows (HDR red)
     if (slowIntensity > 0.02) {
+      const color = `color(display-p3 1 0 0)` // HDR red
       const pulse = (Math.sin(now * 1.6) + 1) / 2
-      for (let i = 0; i < 10; i++) {
-        const phase = (now * 1.9 + i * 0.42) % 2.7
-        const t = phase / 2.7
-        const y = cy - 50 + t * 150
-        const x = cx + Math.cos(now * 2.3 + i) * 28
-        const size = 10 + pulse * 5
 
-        ctx.save()
-        ctx.translate(x, y)
-        ctx.globalAlpha = (1 - t) ** 1.4 * 0.9 * slowIntensity
-        ctx.fillStyle = `color(display-p3 0.85 0.95 1.8)`
-        ctx.shadowBlur = 18
-        ctx.shadowColor = `color(display-p3 0.7 0.9 2.0)`
+      for (let i = 0; i < 8; i++) {
+        const phase = (now * 1.8 + i * 0.42) % 2.0
+        const t = phase / 2.0
 
-        ctx.beginPath()
-        ctx.moveTo(0, size * 1.1)
-        ctx.lineTo(size * 0.7, -size * 0.4)
-        ctx.lineTo(-size * 0.7, -size * 0.4)
-        ctx.closePath()
-        ctx.fill()
-        ctx.fillRect(-size * 0.3, -size * 0.95, size * 0.6, size * 0.9)
-        ctx.restore()
+        const size = w * 0.28 + pulse * 3
+
+        const yStart = cy - h * 1.0 // well above head
+        const yEnd = cy - h * 0.35 // top half only
+        const y = yStart + (yEnd - yStart) * t
+
+        const x = cx + Math.cos(now * 2 + i) * (w * 0.2)
+        const alpha = (1 - t) ** 1.35 * slowIntensity * 0.9
+
+        this._drawArrow(ctx, x, y, size, color, alpha, -1)
       }
     }
 
