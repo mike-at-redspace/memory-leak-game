@@ -8,7 +8,8 @@ import {
   TARGET_ITEMS,
   Directions,
   ScreenConfig,
-  ProcGenConfig
+  ProcGenConfig,
+  ItemPlacementConfig
 } from '../config/index.js'
 import { seededRandom } from '../utils/math.js'
 
@@ -21,7 +22,7 @@ const PROC_GEN = ProcGenConfig
 export class World {
   constructor() {
     this._collectedItems = new Set()
-    this._levelSeed = 0
+    this._levelSeed = Math.floor(Math.random() * 2147483647) // Random seed for first level
 
     // Pre-calculate total rarity weight to avoid re-looping every frame
     this._totalItemRarity = ITEM_REGISTRY.reduce(
@@ -34,14 +35,17 @@ export class World {
 
   /**
    * Resets the world state and regenerates the map and items for a new level.
+   * Generates a random seed for each level to ensure unique layouts.
    *
-   * @param {number} [level=1]  - The current level number (used for seed
-   *                            variation).
+   * @param {number} [_level=1]  - The current level number (for reference
+   *                             only).
    * @returns {void}
    */
-  reset(level = 1) {
+  // eslint-disable-next-line no-unused-vars
+  reset(_level = 1) {
     this._collectedItems.clear()
-    this._levelSeed = level
+    // Generate a new random seed for each level
+    this._levelSeed = Math.floor(Math.random() * 2147483647)
     // Regenerate guaranteed items for the new level
     this._guaranteedItemTiles.clear()
     this._populateGuaranteedItems()
@@ -148,7 +152,8 @@ export class World {
   /**
    * Prepares a fixed mapping from tiles to required collectibles so every
    * target item is present at least once in the world. Uses level seed to vary
-   * placement each level.
+   * placement each level. Enhanced with minimum distance constraints between
+   * same item types, spawn awareness, and improved distribution.
    *
    * @returns {void}
    * @access private
@@ -157,21 +162,270 @@ export class World {
     const required = TARGET_ITEMS.length
     if (required === 0) return
 
-    let limit = Math.max(160, required * 3)
-    let candidateTiles = this._collectFloorTiles(required, limit)
+    // Get player spawn location for spawn-aware placement
+    const spawn = this.findSpawn()
+    const spawnTx = Math.floor(spawn.x / PhysicsConfig.TileSize)
+    const spawnTy = Math.floor(spawn.y / PhysicsConfig.TileSize)
 
-    while (candidateTiles.length < required && limit <= 400) {
+    const config = ItemPlacementConfig
+    let limit = Math.max(160, required * 3)
+    let candidateTiles = this._collectFloorTiles(
+      required * 4,
+      limit,
+      spawnTx,
+      spawnTy
+    )
+
+    while (candidateTiles.length < required * 2 && limit <= 400) {
       limit += 40
-      candidateTiles = this._collectFloorTiles(required, limit)
+      candidateTiles = this._collectFloorTiles(
+        required * 4,
+        limit,
+        spawnTx,
+        spawnTy
+      )
     }
 
-    // Shuffle candidate tiles using level seed to vary placement each level
+    // Shuffle candidate tiles using level seed
     const shuffledTiles = this._shuffleWithSeed(candidateTiles, this._levelSeed)
 
-    shuffledTiles.slice(0, required).forEach((tile, index) => {
-      const key = `${tile.tx},${tile.ty}`
-      this._guaranteedItemTiles.set(key, TARGET_ITEMS[index])
-    })
+    // Track placement per item type for distance checking
+    const placementsByType = new Map()
+    const placedTiles = []
+
+    // Try to place each item with distance constraints
+    for (let i = 0; i < required; i++) {
+      const item = TARGET_ITEMS[i]
+      const itemType = item.id
+
+      let placed = false
+      let currentMinDistance = config.MinDistanceSameType
+
+      // Score and sort candidate tiles for better placement
+      const scoredTiles = shuffledTiles
+        .map(tile => ({
+          tile,
+          score: this._scoreTileForPlacement(
+            tile,
+            spawnTx,
+            spawnTy,
+            placedTiles,
+            placementsByType.get(itemType) || [],
+            currentMinDistance
+          )
+        }))
+        .filter(scored => scored.score > 0)
+        .sort((a, b) => b.score - a.score)
+
+      // Try placement with constraints, using scored tiles
+      for (
+        let attempt = 0;
+        attempt < Math.min(config.MaxPlacementAttempts, scoredTiles.length) &&
+        !placed;
+        attempt++
+      ) {
+        // Use seed-based weighted selection from top-scored tiles
+        const seedValue = this._levelSeed * 1000009 + i * 10007 + attempt
+        // Prefer higher-scored tiles but allow some randomness
+        const topN = Math.min(100, scoredTiles.length)
+        const weightedIndex = Math.floor(
+          Math.pow(seededRandom(seedValue), 2) * topN
+        )
+        const scored = scoredTiles[weightedIndex]
+
+        if (!scored) continue
+
+        const tile = scored.tile
+
+        // Check if this tile is already used
+        if (placedTiles.some(p => p.tx === tile.tx && p.ty === tile.ty)) {
+          continue
+        }
+
+        // Check distance from spawn
+        const spawnDist = this._calculateDistance(
+          spawnTx,
+          spawnTy,
+          tile.tx,
+          tile.ty
+        )
+        if (spawnDist < config.MinDistanceFromSpawn) continue
+        if (spawnDist > config.MaxDistanceFromSpawn) continue
+
+        // Check distance from same item type
+        const existingPlacements = placementsByType.get(itemType) || []
+        const tooClose = existingPlacements.some(existing => {
+          const dist = this._calculateDistance(
+            existing.tx,
+            existing.ty,
+            tile.tx,
+            tile.ty
+          )
+          return dist < currentMinDistance
+        })
+
+        if (!tooClose) {
+          // Basic accessibility check - ensure it's a valid floor tile
+          if (this.getTileType(tile.tx, tile.ty) !== TileTypes.FLOOR) {
+            continue
+          }
+
+          // Place the item
+          const key = `${tile.tx},${tile.ty}`
+          this._guaranteedItemTiles.set(key, item)
+          placedTiles.push(tile)
+
+          if (!placementsByType.has(itemType)) {
+            placementsByType.set(itemType, [])
+          }
+          placementsByType.get(itemType).push(tile)
+          placed = true
+        }
+      }
+
+      // Fallback: relax constraints and try again
+      if (!placed && config.RelaxDistanceOnFailure) {
+        currentMinDistance = Math.max(
+          config.MinDistanceSameTypeFallback,
+          currentMinDistance - 2
+        )
+        const relaxedSpawnMin = Math.max(1, config.MinDistanceFromSpawn - 2)
+
+        // Re-score tiles with relaxed constraints
+        const relaxedScoredTiles = shuffledTiles
+          .map(tile => ({
+            tile,
+            score: this._scoreTileForPlacementRelaxed(
+              tile,
+              spawnTx,
+              spawnTy,
+              placedTiles,
+              placementsByType.get(itemType) || [],
+              currentMinDistance,
+              relaxedSpawnMin
+            )
+          }))
+          .filter(scored => scored.score > 0)
+          .sort((a, b) => b.score - a.score)
+
+        for (
+          let attempt = 0;
+          attempt < Math.min(1000, relaxedScoredTiles.length) && !placed;
+          attempt++
+        ) {
+          const seedValue =
+            this._levelSeed * 1000009 + i * 10007 + attempt + 10000
+          const topN = Math.min(100, relaxedScoredTiles.length)
+          const weightedIndex = Math.floor(
+            Math.pow(seededRandom(seedValue), 2) * topN
+          )
+          const scored = relaxedScoredTiles[weightedIndex]
+
+          if (!scored) continue
+
+          const tile = scored.tile
+
+          // Check if already used
+          if (placedTiles.some(p => p.tx === tile.tx && p.ty === tile.ty)) {
+            continue
+          }
+
+          // Check distance from spawn (relaxed)
+          const spawnDist = this._calculateDistance(
+            spawnTx,
+            spawnTy,
+            tile.tx,
+            tile.ty
+          )
+          if (spawnDist < relaxedSpawnMin) continue
+
+          // Check distance from same item type (relaxed)
+          const existingPlacements = placementsByType.get(itemType) || []
+          const tooClose = existingPlacements.some(existing => {
+            const dist = this._calculateDistance(
+              existing.tx,
+              existing.ty,
+              tile.tx,
+              tile.ty
+            )
+            return dist < currentMinDistance
+          })
+
+          if (
+            !tooClose &&
+            this.getTileType(tile.tx, tile.ty) === TileTypes.FLOOR
+          ) {
+            const key = `${tile.tx},${tile.ty}`
+            this._guaranteedItemTiles.set(key, item)
+            placedTiles.push(tile)
+
+            if (!placementsByType.has(itemType)) {
+              placementsByType.set(itemType, [])
+            }
+            placementsByType.get(itemType).push(tile)
+            placed = true
+          }
+        }
+      }
+
+      // Final fallback: place at any available tile (best effort)
+      if (!placed) {
+        // Find best available tile by scoring all remaining tiles
+        let bestTile = null
+        let bestScore = -1
+
+        for (const tile of shuffledTiles) {
+          if (placedTiles.some(p => p.tx === tile.tx && p.ty === tile.ty)) {
+            continue
+          }
+          if (this.getTileType(tile.tx, tile.ty) !== TileTypes.FLOOR) {
+            continue
+          }
+
+          // Check minimum distance from same item type even in final fallback
+          const existingPlacements = placementsByType.get(itemType) || []
+          const tooClose = existingPlacements.some(existing => {
+            const dist = this._calculateDistance(
+              existing.tx,
+              existing.ty,
+              tile.tx,
+              tile.ty
+            )
+            return dist < config.MinDistanceSameTypeFallback
+          })
+
+          if (tooClose) continue
+
+          // Score this tile even with relaxed constraints
+          const score = this._scoreTileForPlacementRelaxed(
+            tile,
+            spawnTx,
+            spawnTy,
+            placedTiles,
+            placementsByType.get(itemType) || [],
+            config.MinDistanceSameTypeFallback, // Still enforce minimum distance
+            0 // No spawn distance requirement
+          )
+
+          if (score > bestScore) {
+            bestScore = score
+            bestTile = tile
+          }
+        }
+
+        if (bestTile) {
+          const key = `${bestTile.tx},${bestTile.ty}`
+          this._guaranteedItemTiles.set(key, item)
+          placedTiles.push(bestTile)
+
+          if (!placementsByType.has(itemType)) {
+            placementsByType.set(itemType, [])
+          }
+          placementsByType.get(itemType).push(bestTile)
+          placed = true
+        }
+      }
+    }
   }
 
   /**
@@ -192,26 +446,318 @@ export class World {
   }
 
   /**
+   * Calculates distance between two tile coordinates.
+   *
+   * @param {number} x1  - First tile X coordinate.
+   * @param {number} y1  - First tile Y coordinate.
+   * @param {number} x2  - Second tile X coordinate.
+   * @param {number} y2  - Second tile Y coordinate.
+   * @returns {number} Distance in tiles.
+   * @access private
+   */
+  _calculateDistance(x1, y1, x2, y2) {
+    const dx = Math.abs(x2 - x1)
+    const dy = Math.abs(y2 - y1)
+
+    if (ItemPlacementConfig.UseEuclideanDistance) {
+      return Math.sqrt(dx * dx + dy * dy)
+    }
+    // Manhattan distance
+    return dx + dy
+  }
+
+  /**
+   * Scores a tile for item placement based on distance from spawn, other items,
+   * and accessibility.
+   *
+   * @param {{ tx: number; ty: number }} tile
+   * - Tile to score.
+   * @param {number} spawnTx
+   * - Spawn tile X coordinate.
+   * @param {number} spawnTy
+   * - Spawn tile Y coordinate.
+   * @param {Array} placedTiles
+   * - Already placed tiles.
+   * @param {Array} sameTypePlacements
+   * - Placements of same item type.
+   * @param {number} minDistance
+   * - Minimum distance requirement.
+   * @returns {number}
+   * Score (higher is better, 0 means invalid).
+   * @access private
+   */
+  _scoreTileForPlacement(
+    tile,
+    spawnTx,
+    spawnTy,
+    placedTiles,
+    sameTypePlacements,
+    minDistance
+  ) {
+    // Check if tile is already used
+    if (placedTiles.some(p => p.tx === tile.tx && p.ty === tile.ty)) {
+      return 0
+    }
+
+    // Check if it's a valid floor tile
+    if (this.getTileType(tile.tx, tile.ty) !== TileTypes.FLOOR) {
+      return 0
+    }
+
+    const config = ItemPlacementConfig
+
+    // Check distance from spawn
+    const spawnDist = this._calculateDistance(
+      spawnTx,
+      spawnTy,
+      tile.tx,
+      tile.ty
+    )
+    if (spawnDist < config.MinDistanceFromSpawn) return 0
+    if (spawnDist > config.MaxDistanceFromSpawn) return 0
+
+    // Check distance from same item type
+    const tooClose = sameTypePlacements.some(existing => {
+      const dist = this._calculateDistance(
+        existing.tx,
+        existing.ty,
+        tile.tx,
+        tile.ty
+      )
+      return dist < minDistance
+    })
+
+    if (tooClose) return 0
+
+    // Calculate score: prefer tiles with good spacing
+    let score = 100
+
+    // Bonus for being at good distance from spawn (not too close, not too far)
+    const idealSpawnDist =
+      (config.MinDistanceFromSpawn + config.MaxDistanceFromSpawn) / 2
+    const spawnDistScore = 100 - Math.abs(spawnDist - idealSpawnDist) * 2
+    score += Math.max(0, spawnDistScore)
+
+    // Bonus for being far from same-type items
+    if (sameTypePlacements.length > 0) {
+      const minSameTypeDist = Math.min(
+        ...sameTypePlacements.map(existing =>
+          this._calculateDistance(existing.tx, existing.ty, tile.tx, tile.ty)
+        )
+      )
+      score += minSameTypeDist * 5
+    }
+
+    // Bonus for being far from all placed items (better distribution)
+    if (placedTiles.length > 0) {
+      const avgDist =
+        placedTiles.reduce((sum, placed) => {
+          return (
+            sum +
+            this._calculateDistance(placed.tx, placed.ty, tile.tx, tile.ty)
+          )
+        }, 0) / placedTiles.length
+      score += avgDist * 2
+    }
+
+    return score
+  }
+
+  /**
+   * Scores a tile for item placement with relaxed constraints (for fallback).
+   *
+   * @param {{ tx: number; ty: number }} tile
+   * - Tile to score.
+   * @param {number} spawnTx
+   * - Spawn tile X coordinate.
+   * @param {number} spawnTy
+   * - Spawn tile Y coordinate.
+   * @param {Array} placedTiles
+   * - Already placed tiles.
+   * @param {Array} sameTypePlacements
+   * - Placements of same item type.
+   * @param {number} minDistance
+   * - Minimum distance requirement (may be 0).
+   * @param {number} minSpawnDist
+   * - Minimum spawn distance (may be 0).
+   * @returns {number}
+   * Score (higher is better, 0 means invalid).
+   * @access private
+   */
+  _scoreTileForPlacementRelaxed(
+    tile,
+    spawnTx,
+    spawnTy,
+    placedTiles,
+    sameTypePlacements,
+    minDistance,
+    minSpawnDist
+  ) {
+    // Check if tile is already used
+    if (placedTiles.some(p => p.tx === tile.tx && p.ty === tile.ty)) {
+      return 0
+    }
+
+    // Check if it's a valid floor tile
+    if (this.getTileType(tile.tx, tile.ty) !== TileTypes.FLOOR) {
+      return 0
+    }
+
+    const config = ItemPlacementConfig
+
+    // Check distance from spawn (relaxed)
+    const spawnDist = this._calculateDistance(
+      spawnTx,
+      spawnTy,
+      tile.tx,
+      tile.ty
+    )
+    if (spawnDist < minSpawnDist) return 0
+    if (spawnDist > config.MaxDistanceFromSpawn) return 0
+
+    // Check distance from same item type (relaxed)
+    if (minDistance > 0) {
+      const tooClose = sameTypePlacements.some(existing => {
+        const dist = this._calculateDistance(
+          existing.tx,
+          existing.ty,
+          tile.tx,
+          tile.ty
+        )
+        return dist < minDistance
+      })
+
+      if (tooClose) return 0
+    }
+
+    // Calculate score with relaxed constraints
+    let score = 50 // Lower base score for relaxed placement
+
+    // Still prefer good spacing
+    if (sameTypePlacements.length > 0) {
+      const minSameTypeDist = Math.min(
+        ...sameTypePlacements.map(existing =>
+          this._calculateDistance(existing.tx, existing.ty, tile.tx, tile.ty)
+        )
+      )
+      score += minSameTypeDist * 3
+    }
+
+    if (placedTiles.length > 0) {
+      const avgDist =
+        placedTiles.reduce((sum, placed) => {
+          return (
+            sum +
+            this._calculateDistance(placed.tx, placed.ty, tile.tx, tile.ty)
+          )
+        }, 0) / placedTiles.length
+      score += avgDist
+    }
+
+    return score
+  }
+
+  /**
    * Collects floor tile coordinates within a square radius to assign forced
-   * spawns for guaranteed items.
+   * spawns for guaranteed items. Uses a spiral pattern for better distribution.
+   * Now spawn-aware to filter tiles by distance from spawn.
    *
    * @param {number} needed
    * - Number of floor tiles required.
    * @param {number} limit
    * - Radius (in tiles) to examine around the origin.
+   * @param {number} spawnTx
+   * - Spawn tile X coordinate.
+   * @param {number} spawnTy
+   * - Spawn tile Y coordinate.
    * @returns {Array.<{ tx: number; ty: number }>}
    */
-  _collectFloorTiles(needed, limit) {
+  _collectFloorTiles(needed, limit, spawnTx = 0, spawnTy = 0) {
     const tiles = []
+    const tileSet = new Set() // Avoid duplicates
 
-    for (let tx = -limit; tx <= limit && tiles.length < needed; tx++) {
-      for (let ty = -limit; ty <= limit && tiles.length < needed; ty++) {
-        if (this.getTileType(tx, ty) !== TileTypes.FLOOR) continue
-        tiles.push({ tx, ty })
+    // Spiral outward from origin for better distribution
+    for (let radius = 0; radius <= limit && tiles.length < needed; radius++) {
+      // Top and bottom rows
+      for (let tx = -radius; tx <= radius && tiles.length < needed; tx++) {
+        this._addFloorTileIfValid(tiles, tileSet, tx, -radius, spawnTx, spawnTy)
+        this._addFloorTileIfValid(tiles, tileSet, tx, radius, spawnTx, spawnTy)
+      }
+
+      // Left and right columns (excluding corners already covered)
+      for (let ty = -radius + 1; ty < radius && tiles.length < needed; ty++) {
+        this._addFloorTileIfValid(tiles, tileSet, -radius, ty, spawnTx, spawnTy)
+        this._addFloorTileIfValid(tiles, tileSet, radius, ty, spawnTx, spawnTy)
       }
     }
 
     return tiles
+  }
+
+  /**
+   * Divides tiles into zones for better spatial distribution.
+   *
+   * @param {Array}  tiles      - Array of tile coordinates.
+   * @param {number} zoneCount  - Number of zones to create.
+   * @param {number} spawnTx    - Spawn tile X coordinate.
+   * @param {number} spawnTy    - Spawn tile Y coordinate.
+   * @returns {Array[]} Array of zone arrays, each containing tiles.
+   * @access private
+   */
+  _divideIntoZones(tiles, zoneCount, spawnTx, spawnTy) {
+    if (zoneCount <= 1 || tiles.length === 0) {
+      return [tiles]
+    }
+
+    // Create zones based on angular division around spawn
+    const zones = Array.from({ length: zoneCount }, () => [])
+
+    for (const tile of tiles) {
+      // Calculate angle from spawn to tile
+      const dx = tile.tx - spawnTx
+      const dy = tile.ty - spawnTy
+      const angle = Math.atan2(dy, dx) // Range: -PI to PI
+
+      // Convert to 0 to 2*PI range
+      const normalizedAngle = angle < 0 ? angle + Math.PI * 2 : angle
+
+      // Assign to zone based on angle
+      const zoneIndex =
+        Math.floor((normalizedAngle / (Math.PI * 2)) * zoneCount) % zoneCount
+
+      zones[zoneIndex].push(tile)
+    }
+
+    return zones
+  }
+
+  /**
+   * Helper to add a floor tile if valid and not already added.
+   * Filters by distance from spawn if spawn coordinates provided.
+   *
+   * @param {Array}  tiles    - Array to add tile to.
+   * @param {Set}    tileSet  - Set tracking already added tiles.
+   * @param {number} tx       - Tile X coordinate.
+   * @param {number} ty       - Tile Y coordinate.
+   * @param {number} spawnTx  - Spawn tile X coordinate.
+   * @param {number} spawnTy  - Spawn tile Y coordinate.
+   * @returns {void}
+   * @access private
+   */
+  _addFloorTileIfValid(tiles, tileSet, tx, ty, spawnTx = 0, spawnTy = 0) {
+    const key = `${tx},${ty}`
+    if (tileSet.has(key)) return
+
+    if (this.getTileType(tx, ty) !== TileTypes.FLOOR) return
+
+    // Check distance from spawn
+    const config = ItemPlacementConfig
+    const spawnDist = this._calculateDistance(spawnTx, spawnTy, tx, ty)
+    if (spawnDist < config.MinDistanceFromSpawn) return
+    if (spawnDist > config.MaxDistanceFromSpawn) return
+
+    tiles.push({ tx, ty })
+    tileSet.add(key)
   }
 
   /**

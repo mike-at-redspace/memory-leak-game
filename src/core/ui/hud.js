@@ -70,7 +70,7 @@ export class HudRenderer {
    */
   _drawScorePanel(stats, scale, level) {
     const layout = this._layout
-    // Increase panel height slightly to accommodate level display
+
     const panel = {
       x: layout.outerMargin,
       y: layout.outerMargin,
@@ -99,7 +99,7 @@ export class HudRenderer {
       panel.y + layout.scoreTitleY * scale
     )
 
-    // Values
+    // Values (SWAPPED ORDER)
     this._ctx.fillStyle = '#fff'
     this._ctx.font = `700 ${layout.valueFontSize * scale}px ${this._fonts.Monospace}`
     this._ctx.textAlign = 'right'
@@ -107,31 +107,35 @@ export class HudRenderer {
     const rightEdge = panel.x + panel.w - layout.innerPadding * scale
     const levelY = panel.y + layout.fragmentsY * scale + 30 * scale
 
-    this._ctx.fillText(
-      stats.score,
-      rightEdge,
-      panel.y + layout.scoreValueY * scale
-    )
+    // cache fragments FIRST
     this._ctx.fillText(
       `${stats.uniqueFound}/${this._targetItems.length}`,
       rightEdge,
-      panel.y + layout.fragmentsY * scale
+      panel.y + layout.scoreValueY * scale // swap target y
     )
+
+    // score SECOND
+    this._ctx.fillText(
+      stats.score,
+      rightEdge,
+      panel.y + layout.fragmentsY * scale // swap target y
+    )
+
     this._ctx.fillText(`LEVEL ${level}`, rightEdge, levelY)
 
-    // Labels
+    // Labels (SWAPPED)
     this._ctx.fillStyle = '#ccc'
     this._ctx.font = `400 ${layout.labelFontSize * scale}px ${this._fonts.Monospace}`
     this._ctx.textAlign = 'left'
 
     const leftEdge = panel.x + layout.innerPadding * scale
 
-    this._ctx.fillText('SCORE', leftEdge, panel.y + layout.scoreValueY * scale)
     this._ctx.fillText(
       'FRAGMENTS',
       leftEdge,
-      panel.y + layout.fragmentsY * scale
+      panel.y + layout.scoreValueY * scale
     )
+    this._ctx.fillText('SCORE', leftEdge, panel.y + layout.fragmentsY * scale)
     this._ctx.fillText('LEVEL', leftEdge, levelY)
   }
 

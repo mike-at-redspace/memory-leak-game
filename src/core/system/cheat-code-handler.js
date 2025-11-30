@@ -99,7 +99,7 @@ export class CheatCodeHandler {
     }
 
     // Check all registered cheat codes
-    for (const [code, callback] of this._cheatCallbacks) {
+    for (const [code] of this._cheatCallbacks) {
       if (this._cheatBuffer.endsWith(code)) {
         this.toggle(code)
         this._cheatBuffer = ''

@@ -217,6 +217,7 @@ export class Renderer {
     this._drawPlayer(player, camera)
     if (cheats && cheats.isActive('hitbox')) {
       this._drawCollisionBox(player, camera)
+      this._drawItemHitboxes(world, camera, width, height)
     }
     this._renderParticles(particles, camera)
 
@@ -848,6 +849,63 @@ export class Renderer {
       cornerSize,
       cornerSize
     )
+
+    ctx.restore()
+  }
+
+  /**
+   * Draws collision circles for all visible items when hitbox cheat is active.
+   * Items use circular collision detection with a 50-pixel radius, but we show
+   * a smaller visual hitbox (20px) for better clarity.
+   *
+   * @param {World}  world       - The world instance.
+   * @param {Object} camera      - Camera position {x, y}.
+   * @param {number} viewWidth   - Viewport width.
+   * @param {number} viewHeight  - Viewport height.
+   * @access private
+   */
+  _drawItemHitboxes(world, camera, viewWidth, viewHeight) {
+    const ctx = this._ctx
+    const ts = PhysicsConfig.TileSize
+    const halfTile = ts / 2
+    const itemCollisionRadius = 20 // Visual hitbox size (actual collision is 50px)
+
+    // Calculate visible range (same as _drawWorld)
+    const startX = Math.floor(camera.x / ts) - 1
+    const endX = Math.ceil((camera.x + viewWidth) / ts) + 1
+    const startY = Math.floor(camera.y / ts) - 1
+    const endY = Math.ceil((camera.y + viewHeight) / ts) + 1
+
+    ctx.save()
+
+    // Draw collision circles for items
+    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)' // Green for items (different from red player box)
+    ctx.lineWidth = 2
+    ctx.setLineDash([4, 4]) // Dashed line to distinguish from player box
+
+    for (let ty = startY; ty < endY; ty++) {
+      for (let tx = startX; tx < endX; tx++) {
+        const item = world.getItemAt(tx, ty)
+        if (!item) continue
+
+        // Item position is at tile center (matching engine.js collision check)
+        const itemX = tx * ts + halfTile
+        const itemY = ty * ts + halfTile
+
+        // Convert to screen coordinates
+        const screenX = itemX - camera.x
+        const screenY = itemY - camera.y
+
+        // Draw circle
+        ctx.beginPath()
+        ctx.arc(screenX, screenY, itemCollisionRadius, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // Draw center point
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.6)'
+        ctx.fillRect(screenX - 2, screenY - 2, 4, 4)
+      }
+    }
 
     ctx.restore()
   }

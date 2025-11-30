@@ -113,7 +113,7 @@ export const GameStates = Object.freeze({
  */
 export const CollisionConfig = Object.freeze({
   Width: 32,
-  Height: 64,
+  Height: 48, // Reduced from 64 to allow walking under items
   VerticalOffset: 72
 })
 
@@ -134,6 +134,29 @@ export const ProcGenConfig = Object.freeze({
   ItemSeed: { X: 1234567, Y: 9876543 },
   SpawnChance: 0.08,
   ConnectionThresholds: { One: 0.33, Two: 0.66 }
+})
+
+/**
+ * Item placement configuration for guaranteed item distribution.
+ *
+ * @type {Readonly<{
+ *   MinDistanceSameType: number
+ *   MinDistanceFromSpawn: number
+ *   MaxDistanceFromSpawn: number
+ *   UseEuclideanDistance: boolean
+ *   DistributionZones: number
+ *   MaxPlacementAttempts: number
+ *   RelaxDistanceOnFailure: boolean
+ * }>}
+ */
+export const ItemPlacementConfig = Object.freeze({
+  MinDistanceSameType: 4, // Reduced from 6 to allow more placement options
+  MinDistanceFromSpawn: 2, // Reduced from 3
+  MaxDistanceFromSpawn: 500, // Much larger to avoid filtering out valid tiles
+  UseEuclideanDistance: false,
+  MaxPlacementAttempts: 2000,
+  RelaxDistanceOnFailure: true,
+  MinDistanceSameTypeFallback: 2 // Minimum distance even in fallback
 })
 
 /**

@@ -102,7 +102,7 @@ export class AudioController {
     if (this._musicSource) {
       try {
         this._musicSource.stop()
-      } catch (e) {
+      } catch {
         // Source may already be stopped
       }
       this._musicSource.disconnect()
