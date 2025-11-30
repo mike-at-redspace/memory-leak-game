@@ -313,6 +313,12 @@ export class GameEngine {
         this.audio.toggleMute()
         return
       }
+
+      const fullscreenBtn = this.renderer.getFullscreenButtonRect()
+      if (this._isPointInRect(x, y, fullscreenBtn)) {
+        this._toggleFullscreen()
+        return
+      }
     }
 
     this._handleStateClickInteraction()
@@ -750,6 +756,47 @@ export class GameEngine {
     return (
       x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h
     )
+  }
+
+  /**
+   * Toggles fullscreen mode for the game canvas.
+   *
+   * @returns {void}
+   * @access private
+   */
+  _toggleFullscreen() {
+    const canvas = this.canvas
+
+    // Check if currently in fullscreen
+    const isFullscreen =
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+
+    if (!isFullscreen) {
+      // Enter fullscreen
+      if (canvas.requestFullscreen) {
+        canvas.requestFullscreen()
+      } else if (canvas.webkitRequestFullscreen) {
+        canvas.webkitRequestFullscreen()
+      } else if (canvas.mozRequestFullScreen) {
+        canvas.mozRequestFullScreen()
+      } else if (canvas.msRequestFullscreen) {
+        canvas.msRequestFullscreen()
+      }
+    } else {
+      // Exit fullscreen
+      if (document.exitFullscreen) {
+        document.exitFullscreen()
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen()
+      } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen()
+      } else if (document.msExitFullscreen) {
+        document.msExitFullscreen()
+      }
+    }
   }
 
   _activateJumpCheat() {

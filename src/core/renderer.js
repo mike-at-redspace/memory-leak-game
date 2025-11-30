@@ -157,6 +157,12 @@ export class Renderer {
    */
   get scaleFactor() {
     const width = this._canvas.width
+    // Scale down for mobile devices under 768px
+    if (width < 768) {
+      // Scale proportionally: 0.6x at 320px, 0.8x at 640px, 1.0x at 768px
+      const mobileScale = 0.6 + ((width - 320) / (768 - 320)) * 0.4
+      return Math.max(0.6, Math.min(1.0, mobileScale))
+    }
     if (width > ScreenConfig.LargeScreenThreshold) {
       // Scale proportionally for screens over 1920px (reduced scaling)
       // At 1920px: 1.5x, at 2560px: ~1.75x, at 3840px: ~2.25x
@@ -175,6 +181,15 @@ export class Renderer {
    */
   getMuteButtonRect() {
     return this._hudRenderer.getMuteButtonRect()
+  }
+
+  /**
+   * Returns the bounding rect of the fullscreen button for input handling.
+   *
+   * @returns {{ x: number; y: number; w: number; h: number }}
+   */
+  getFullscreenButtonRect() {
+    return this._hudRenderer.getFullscreenButtonRect()
   }
 
   /**
@@ -1022,9 +1037,30 @@ export class Renderer {
   /**
    * @access private
    */
+  /**
+   * Updates canvas size to match window dimensions.
+   * Applies CSS scaling for mobile devices while keeping internal resolution.
+   *
+   * @access private
+   */
   _resize() {
-    this._canvas.width = this._window.innerWidth
-    this._canvas.height = this._window.innerHeight
+    const width = this._window.innerWidth
+    const height = this._window.innerHeight
+
+    // Set internal canvas resolution (always full size)
+    this._canvas.width = width
+    this._canvas.height = height
+
+    // Apply CSS transform scaling for mobile devices (under 768px)
+    // This scales the visual display while keeping game logic and pointer events at full resolution
+    if (width < 768) {
+      const mobileScale = this.scaleFactor
+      this._canvas.style.transformOrigin = 'top left'
+      this._canvas.style.transform = `scale(${mobileScale})`
+    } else {
+      // Reset scaling for larger screens
+      this._canvas.style.transform = 'none'
+    }
   }
 
   /**

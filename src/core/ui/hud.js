@@ -38,6 +38,7 @@ export class HudRenderer {
 
     // State for hit-testing interactive elements
     this._muteButtonRect = { x: 0, y: 0, w: 0, h: 0 }
+    this._fullscreenButtonRect = { x: 0, y: 0, w: 0, h: 0 }
   }
 
   /**
@@ -57,6 +58,7 @@ export class HudRenderer {
     this._drawInventoryPanel(hud, width, scale)
     this._drawMemoryBar(stats.playerHealth, width, height, scale)
     this._drawMuteButton(isMuted, width, height, scale)
+    this._drawFullscreenButton(width, height, scale)
 
     if (hud.messageTimer > 0) {
       this._drawStatusMessage(hud, width, height, scale)
@@ -287,14 +289,17 @@ export class HudRenderer {
 
   /**
    * Renders the mute button and updates its hit-box.
+   * Positioned in the lower right corner.
    *
    * @access private
    */
   _drawMuteButton(isMuted, canvasWidth, canvasHeight, scale) {
     const layout = this._layout
     const size = layout.muteButtonSize * scale
+    const spacing = 10 * scale
+    // Position in lower right, above fullscreen button
     const x = canvasWidth - size - layout.outerMargin
-    const y = layout.outerMargin
+    const y = canvasHeight - size * 2 - spacing - layout.outerMargin
 
     // Update hit-box for input controller
     this._muteButtonRect = { x, y, w: size, h: size }
@@ -317,6 +322,121 @@ export class HudRenderer {
       x + size / 2,
       y + size / 2 + HudConfig.textVerticalOffset * scale
     )
+  }
+
+  /**
+   * Renders the fullscreen toggle button and updates its hit-box.
+   * Positioned in the lower right corner.
+   *
+   * @access private
+   */
+  _drawFullscreenButton(canvasWidth, canvasHeight, scale) {
+    const layout = this._layout
+    const size = layout.muteButtonSize * scale
+    // Position in lower right corner
+    const x = canvasWidth - size - layout.outerMargin
+    const y = canvasHeight - size - layout.outerMargin
+
+    // Update hit-box for input controller
+    this._fullscreenButtonRect = { x, y, w: size, h: size }
+
+    // Check if currently in fullscreen
+    const isFullscreen =
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+
+    this._drawRoundedRect(
+      x,
+      y,
+      size,
+      size,
+      layout.buttonRadius,
+      this._colors.UiBackground,
+      this._colors.UiBorder
+    )
+
+    // Draw fullscreen icon using canvas paths
+    this._drawFullscreenIcon(x, y, size, isFullscreen, scale)
+  }
+
+  /**
+   * Draws a fullscreen icon (expand/compress arrows).
+   *
+   * @access private
+   */
+  _drawFullscreenIcon(x, y, size, isFullscreen, scale) {
+    const ctx = this._ctx
+    const centerX = x + size / 2
+    const centerY = y + size / 2
+    const iconSize = size * 0.4
+    const lineWidth = 2 * scale
+
+    ctx.save()
+    ctx.strokeStyle = '#fff'
+    ctx.fillStyle = '#fff'
+    ctx.lineWidth = lineWidth
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+
+    if (isFullscreen) {
+      // Draw compress icon (arrows pointing inward)
+      const offset = iconSize * 0.3
+      // Top-left arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX - iconSize / 2, centerY - iconSize / 2 - offset)
+      ctx.lineTo(centerX - iconSize / 2, centerY - iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2 - offset, centerY - iconSize / 2)
+      ctx.stroke()
+      // Top-right arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX + iconSize / 2, centerY - iconSize / 2 - offset)
+      ctx.lineTo(centerX + iconSize / 2, centerY - iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2 + offset, centerY - iconSize / 2)
+      ctx.stroke()
+      // Bottom-left arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX - iconSize / 2, centerY + iconSize / 2 + offset)
+      ctx.lineTo(centerX - iconSize / 2, centerY + iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2 - offset, centerY + iconSize / 2)
+      ctx.stroke()
+      // Bottom-right arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX + iconSize / 2, centerY + iconSize / 2 + offset)
+      ctx.lineTo(centerX + iconSize / 2, centerY + iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2 + offset, centerY + iconSize / 2)
+      ctx.stroke()
+    } else {
+      // Draw expand icon (arrows pointing outward)
+      const offset = iconSize * 0.3
+      // Top-left arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX - iconSize / 2 + offset, centerY - iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2, centerY - iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2, centerY - iconSize / 2 + offset)
+      ctx.stroke()
+      // Top-right arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX + iconSize / 2 - offset, centerY - iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2, centerY - iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2, centerY - iconSize / 2 + offset)
+      ctx.stroke()
+      // Bottom-left arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX - iconSize / 2 + offset, centerY + iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2, centerY + iconSize / 2)
+      ctx.lineTo(centerX - iconSize / 2, centerY + iconSize / 2 - offset)
+      ctx.stroke()
+      // Bottom-right arrow
+      ctx.beginPath()
+      ctx.moveTo(centerX + iconSize / 2 - offset, centerY + iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2, centerY + iconSize / 2)
+      ctx.lineTo(centerX + iconSize / 2, centerY + iconSize / 2 - offset)
+      ctx.stroke()
+    }
+
+    ctx.restore()
   }
 
   /**
@@ -380,5 +500,14 @@ export class HudRenderer {
    */
   getMuteButtonRect() {
     return this._muteButtonRect
+  }
+
+  /**
+   * Provides the last calculated fullscreen button bounds for input hit tests.
+   *
+   * @returns {{ x: number; y: number; w: number; h: number }}
+   */
+  getFullscreenButtonRect() {
+    return this._fullscreenButtonRect
   }
 }
