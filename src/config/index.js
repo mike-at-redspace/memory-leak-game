@@ -113,8 +113,8 @@ export const GameStates = Object.freeze({
  */
 export const CollisionConfig = Object.freeze({
   Width: 32,
-  Height: 64,
-  VerticalOffset: 72
+  Height: 48,
+  VerticalOffset: 52
 })
 
 /**

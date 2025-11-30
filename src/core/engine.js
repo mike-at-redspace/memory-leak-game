@@ -12,6 +12,7 @@ import {
   StatsConfig,
   PhysicsConfig,
   SpriteConfig,
+  CollisionConfig,
   TARGET_ITEMS,
   ItemOutlineColors,
   HudConfig
@@ -43,9 +44,6 @@ export class GameEngine {
     this._isRunning = false
     this._animationFrameId = null
     this._boundHandlers = {}
-
-    // Optimization: Collision threshold squared (50px) to avoid sqrt calls
-    this._collisionDistSq = 50 ** 2
 
     this.window = windowRef
     this.document = documentRef
@@ -197,7 +195,7 @@ export class GameEngine {
     const playerCenterY = this.player.y + playerHalfHeight
 
     this.camera.follow(playerCenterX, playerCenterY)
-    this._checkCollisions(playerCenterX, playerCenterY)
+    this._checkCollisions()
 
     // === BOOST IMMUNITY: No memory leak drain during boost ===
     if (!this.player.isBoosted) {
@@ -212,21 +210,34 @@ export class GameEngine {
   }
 
   /**
-   * Checks for item collisions within the player's immediate grid vicinity.
+   * Checks for item collisions using the player's collision box.
    *
-   * - @private.
-   *
-   * @param {number} pCenterX  - The center X coordinate of the player in world
-   *                           space.
-   * @param {number} pCenterY  - The center Y coordinate of the player in world
-   *                           space.
+   * @access private
    * @returns {void}
    */
-  _checkCollisions(pCenterX, pCenterY) {
-    const gridX = Math.floor(pCenterX / PhysicsConfig.TileSize)
-    const gridY = Math.floor(pCenterY / PhysicsConfig.TileSize)
+  _checkCollisions() {
+    // Calculate player's collision box (matching world.js checkCollision logic)
+    const scale = SpriteConfig.Scale
+    const sx = this.player.x
+    const sy = this.player.y
+    const cx = sx + (SpriteConfig.Width * scale) / 2
+    const bottomY =
+      sy + SpriteConfig.Height * scale - CollisionConfig.VerticalOffset
+    const halfWidth = CollisionConfig.Width / 2
+
+    const playerLeft = cx - halfWidth
+    const playerRight = cx + halfWidth
+    const playerTop = bottomY
+    const playerBottom = bottomY + CollisionConfig.Height
+
+    // Get player center for grid calculation
+    const playerCenterX = sx + (SpriteConfig.Width * scale) / 2
+    const playerCenterY = sy + (SpriteConfig.Height * scale) / 2
+    const gridX = Math.floor(playerCenterX / PhysicsConfig.TileSize)
+    const gridY = Math.floor(playerCenterY / PhysicsConfig.TileSize)
     const halfTile = PhysicsConfig.TileSize / 2
 
+    // Check items in nearby tiles
     for (let y = gridY - 1; y <= gridY + 1; y++) {
       for (let x = gridX - 1; x <= gridX + 1; x++) {
         const item = this.world.getItemAt(x, y)
@@ -235,11 +246,13 @@ export class GameEngine {
         const itemX = x * PhysicsConfig.TileSize + halfTile
         const itemY = y * PhysicsConfig.TileSize + halfTile
 
-        const dx = pCenterX - itemX
-        const dy = pCenterY - itemY
-        const distSq = dx * dx + dy * dy
-
-        if (distSq < this._collisionDistSq) {
+        // Check if item point is within player's collision box
+        if (
+          itemX >= playerLeft &&
+          itemX <= playerRight &&
+          itemY >= playerTop &&
+          itemY <= playerBottom
+        ) {
           this.processItem(item, x, y)
         }
       }
