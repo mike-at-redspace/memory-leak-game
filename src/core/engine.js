@@ -1,6 +1,7 @@
 import { clamp } from '../utils/math.js'
 import { AudioController } from './audio.js'
 import { InputController } from './system/input-controller.js'
+import { CheatCodeHandler } from './system/cheat-code-handler.js'
 import { World } from '../world/world.js'
 import { Player } from '../world/player.js'
 import { Camera } from '../world/camera.js'
@@ -84,10 +85,11 @@ export class GameEngine {
     this._boundHandlers.pointer = this.handlePointer.bind(this)
     this.window.addEventListener('pointerdown', this._boundHandlers.pointer)
 
-    // Cheat code buffer
-    this._cheatBuffer = ''
-    this._boundHandlers.keydown = this._handleCheatInput.bind(this)
-    this.window.addEventListener('keydown', this._boundHandlers.keydown)
+    // Cheat code handler
+    this.cheats = new CheatCodeHandler()
+    this.cheats.register('jump', () => this._activateJumpCheat())
+    this.cheats.register('hitbox', () => {}) // Toggle handled by CheatCodeHandler
+    this.cheats.attach(this.window)
   }
 
   /**
@@ -123,10 +125,10 @@ export class GameEngine {
   destroy() {
     this.stop()
     this.window.removeEventListener('pointerdown', this._boundHandlers.pointer)
-    this.window.removeEventListener('keydown', this._boundHandlers.keydown)
     this.input.dispose()
     this.renderer.dispose()
     this.audio.dispose()
+    this.cheats.detach(this.window)
   }
 
   /**
@@ -312,7 +314,8 @@ export class GameEngine {
         this.stats,
         this.hud,
         this.audio.isMuted,
-        this.stats.level
+        this.stats.level,
+        this.cheats
       )
     } else {
       this.renderer.renderEndScreen(
@@ -667,20 +670,7 @@ export class GameEngine {
     )
   }
 
-  _handleCheatInput(e) {
-    this._cheatBuffer += e.key.toLowerCase()
-    if (this._cheatBuffer.length > 10) {
-      this._cheatBuffer = this._cheatBuffer.slice(-10)
-    }
-
-    if (this._cheatBuffer.endsWith('jump')) {
-      this._activateCheat()
-      this._cheatBuffer = ''
-    }
-  }
-
-  _activateCheat() {
-    console.log('CHEAT ACTIVATED: SKIPPING LEVEL')
+  _activateJumpCheat() {
     // Mark all target items as collected
     TARGET_ITEMS.forEach(item => {
       this.collectedUniqueIds.add(item.id)

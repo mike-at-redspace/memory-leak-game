@@ -8,7 +8,8 @@ import {
   SpriteConfig,
   ParticleConfig,
   ItemOutlineColors,
-  LevelThemes
+  LevelThemes,
+  CollisionConfig
 } from '../config/index.js'
 import { HudRenderer } from './ui/hud.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
@@ -181,9 +182,21 @@ export class Renderer {
    * @param {Object}             stats      - Current game statistics.
    * @param {Object}             hud        - Current HUD state.
    * @param {boolean}            isMuted    - Audio mute state.
+   * @param {number}             level      - Current level.
+   * @param {CheatCodeHandler}   cheats     - Cheat code handler instance.
    * @returns {void}
    */
-  renderGame(world, player, camera, particles, stats, hud, isMuted, level) {
+  renderGame(
+    world,
+    player,
+    camera,
+    particles,
+    stats,
+    hud,
+    isMuted,
+    level,
+    cheats
+  ) {
     const width = this._canvas.width
     const height = this._canvas.height
 
@@ -200,6 +213,9 @@ export class Renderer {
     this._drawBackground(width, height, theme)
     this._drawWorld(world, camera, width, height, theme)
     this._drawPlayer(player, camera)
+    if (cheats && cheats.isActive('hitbox')) {
+      this._drawCollisionBox(player, camera)
+    }
     this._renderParticles(particles, camera)
 
     this._hudRenderer.render(
@@ -441,214 +457,293 @@ export class Renderer {
    * @access private
    */
   _drawPlayer(player, camera) {
-  const ctx = this._ctx
-  const now = performance.now() / 1000
+    const ctx = this._ctx
+    const now = performance.now() / 1000
 
-  const px = Math.round(player.x - camera.x)
-  const py = Math.round(player.y - camera.y)
-  const w = SpriteConfig.Width * SpriteConfig.Scale
-  const h = SpriteConfig.Height * SpriteConfig.Scale
-  const cx = px + w / 2
-  const cy = py + h / 2
+    const px = Math.round(player.x - camera.x)
+    const py = Math.round(player.y - camera.y)
+    const w = SpriteConfig.Width * SpriteConfig.Scale
+    const h = SpriteConfig.Height * SpriteConfig.Scale
+    const cx = px + w / 2
+    const cy = py + h / 2
 
-  const isBoosted = !!player.isBoosted
-  const isSlowed = !!player.isSlowed
+    const isBoosted = !!player.isBoosted
+    const isSlowed = !!player.isSlowed
 
-  // Smooth transitions
-  const boostAge = now - (player.boostStartTime || 0)
-  const boostIntensity = isBoosted
-    ? Math.min(1, boostAge / 1.2)
-    : Math.max(0, 1 - (now - (player.boostEndTime || 0)) / 0.7)
+    // Smooth transitions
+    const boostAge = now - (player.boostStartTime || 0)
+    const boostIntensity = isBoosted
+      ? Math.min(1, boostAge / 1.2)
+      : Math.max(0, 1 - (now - (player.boostEndTime || 0)) / 0.7)
 
-  const slowIntensity = isSlowed
-    ? 1
-    : Math.max(0, 1 - (now - (player.slowEndTime || 0)) / 0.8)
+    const slowIntensity = isSlowed
+      ? 1
+      : Math.max(0, 1 - (now - (player.slowEndTime || 0)) / 0.8)
 
-  // --- Maintain a small position history on the player object for consistent trails
-  // Keep these lightweight: only store screen-space px/py and frame
-  if (!player._posHistory) player._posHistory = []
-  player._posHistory.push({ x: px, y: py, frame: player.frame, t: now })
-  // cap history length
-  if (player._posHistory.length > 12) player._posHistory.shift()
+    // --- Maintain a small position history on the player object for consistent trails
+    // Keep these lightweight: only store screen-space px/py and frame
+    if (!player._posHistory) player._posHistory = []
+    player._posHistory.push({ x: px, y: py, frame: player.frame, t: now })
+    // cap history length
+    if (player._posHistory.length > 12) player._posHistory.shift()
 
-  // best-effort velocity fallback (pixels per frame-ish)
-  const prev = player._posHistory.length >= 2
-    ? player._posHistory[player._posHistory.length - 2]
-    : null
-  const vx = (player.vx != null) ? player.vx : (prev ? px - prev.x : 0)
-  const vy = (player.vy != null) ? player.vy : (prev ? py - prev.y : 0)
+    // best-effort velocity fallback (pixels per frame-ish)
+    const prev =
+      player._posHistory.length >= 2
+        ? player._posHistory[player._posHistory.length - 2]
+        : null
+    const vx = player.vx != null ? player.vx : prev ? px - prev.x : 0
+    const vy = player.vy != null ? player.vy : prev ? py - prev.y : 0
 
-  ctx.save()
+    ctx.save()
 
-  // ──────────────────────────────
-  // 1. PLAYER SPRITE (middle layer)
-  // ──────────────────────────────
-  ctx.globalAlpha = 1
-  ctx.shadowBlur = 0
+    // ──────────────────────────────
+    // 1. PLAYER SPRITE (middle layer)
+    // ──────────────────────────────
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
 
-  if (this._sheet.complete && this._sheet.naturalWidth) {
-    ctx.drawImage(
-      this._sheet,
-      player.frame * SpriteConfig.Width,
-      (player.direction || 0) * SpriteConfig.Height,
-      SpriteConfig.Width,
-      SpriteConfig.Height,
-      px,
-      py,
-      w,
-      h
-    )
-  } else {
-    ctx.fillStyle = 'white'
-    ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
-  }
-
-  // ──────────────────────────────
-  // 2. SLOW LAG TRAIL (behind; uses older history entries)
-  // ──────────────────────────────
-  if (isSlowed && slowIntensity > 0.05) {
-    ctx.shadowBlur = 20
-    ctx.shadowColor = `color(display-p3 1 0.5 0.5)` // soft red glow
-
-    // draw N ghosts using older history entries (older = more lag)
-    const slowGhosts = 3
-    for (let i = 1; i <= slowGhosts; i++) {
-      const idx = Math.max(0, player._posHistory.length - 1 - i * 1) // step 1
-      const ghost = player._posHistory[idx]
-      if (!ghost) continue
-
-      // alpha fades with distance in history
-      const alpha = (1 - i / (slowGhosts + 1)) * 0.22 * slowIntensity
-      ctx.globalAlpha = alpha
-
-      // subtle stagger so they don't perfectly overlap
-      const lagX = -i * 6      // consistent backward horizontal offset
-      const lagY = i
+    if (this._sheet.complete && this._sheet.naturalWidth) {
       ctx.drawImage(
         this._sheet,
-        ghost.frame * SpriteConfig.Width,
+        player.frame * SpriteConfig.Width,
         (player.direction || 0) * SpriteConfig.Height,
         SpriteConfig.Width,
         SpriteConfig.Height,
-        ghost.x + lagX,
-        ghost.y + lagY,
+        px,
+        py,
         w,
         h
       )
+    } else {
+      ctx.fillStyle = 'white'
+      ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
     }
+
+    // ──────────────────────────────
+    // 2. SLOW LAG TRAIL (behind; uses older history entries)
+    // ──────────────────────────────
+    if (isSlowed && slowIntensity > 0.05) {
+      ctx.shadowBlur = 20
+      ctx.shadowColor = `color(display-p3 1 0.5 0.5)` // soft red glow
+
+      // draw N ghosts using older history entries (older = more lag)
+      const slowGhosts = 3
+      for (let i = 1; i <= slowGhosts; i++) {
+        const idx = Math.max(0, player._posHistory.length - 1 - i * 1) // step 1
+        const ghost = player._posHistory[idx]
+        if (!ghost) continue
+
+        // alpha fades with distance in history
+        const alpha = (1 - i / (slowGhosts + 1)) * 0.22 * slowIntensity
+        ctx.globalAlpha = alpha
+
+        // subtle stagger so they don't perfectly overlap
+        const lagX = -i * 6 // consistent backward horizontal offset
+        const lagY = i
+        ctx.drawImage(
+          this._sheet,
+          ghost.frame * SpriteConfig.Width,
+          (player.direction || 0) * SpriteConfig.Height,
+          SpriteConfig.Width,
+          SpriteConfig.Height,
+          ghost.x + lagX,
+          ghost.y + lagY,
+          w,
+          h
+        )
+      }
+    }
+
+    // ──────────────────────────────
+    // 2b. BOOST FORWARD TRAIL (mirror of slow but slightly ahead; kept close)
+    // ──────────────────────────────
+    if (isBoosted && boostIntensity > 0.05) {
+      ctx.shadowBlur = 22
+      ctx.shadowColor = `color(display-p3 0 1 1)` // cyan-ish glow
+
+      const boostGhosts = 3
+      for (let i = 1; i <= boostGhosts; i++) {
+        const idx = Math.max(0, player._posHistory.length - 1 - i * 1)
+        const ghost = player._posHistory[idx]
+        if (!ghost) continue
+
+        // Make them slightly forward relative to the ghost point.
+        // Combine a small constant forward offset with a velocity-based nudge
+        const forwardConst = i * 4 // small guaranteed forward offset
+        const forwardVel = (vx || 0) * (i * 0.25) // small velocity contribution
+        const drawX = ghost.x + forwardConst + forwardVel
+        const drawY = ghost.y
+
+        const alpha = (1 - i / (boostGhosts + 1)) * 0.22 * boostIntensity
+        ctx.globalAlpha = alpha
+
+        ctx.drawImage(
+          this._sheet,
+          ghost.frame * SpriteConfig.Width,
+          (player.direction || 0) * SpriteConfig.Height,
+          SpriteConfig.Width,
+          SpriteConfig.Height,
+          drawX,
+          drawY,
+          w,
+          h
+        )
+      }
+
+      // Short, subtle speed-lines pointing forward (tied to velocity magnitude)
+      const speed = Math.hypot(vx || 0, vy || 0)
+      const lineCount = 3
+      ctx.lineWidth = 2
+      ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.45, 0.18 + 0.3 * boostIntensity)})`
+
+      for (let i = 0; i < lineCount; i++) {
+        // random small jitter but keep lines close to player
+        const offsetX = (Math.random() - 0.5) * w * 0.28
+        const offsetY = (Math.random() - 0.5) * h * 0.18
+
+        const len = 6 + Math.min(12, speed * 0.6) // short, grows a bit with speed
+        ctx.beginPath()
+        ctx.moveTo(cx + offsetX, cy + offsetY)
+        ctx.lineTo(
+          cx + offsetX + (vx || 1) * (len * 0.12) + len * 0.6,
+          cy + offsetY + (vy || 0) * (len * 0.12)
+        )
+        ctx.stroke()
+      }
+    }
+
+    // ──────────────────────────────
+    // 3. ARROWS — BOOST UP, SLOW DOWN (top/head area; kept smaller & lower)
+    // ──────────────────────────────
+
+    // Shared arrow sizing (smaller)
+    const arrowBase = w * 0.18
+
+    // BOOST — upward arrows (HDR green)
+    if (boostIntensity > 0.02) {
+      const color = `color(display-p3 0 1 0)` // HDR green
+      const pulse = (Math.sin(now * 4) + 1) / 2
+
+      for (let i = 0; i < 7; i++) {
+        const phase = (now * 2.5 + i * 0.35) % 1.6
+        const t = phase / 1.6
+
+        const size = arrowBase + pulse * 2
+
+        // Match slow arrow vertical range
+        const yStart = cy - h * 0.75 // slightly above head
+        const yEnd = cy - h * 0.2 // upper half
+        const y = yStart + (yEnd - yStart) * t
+
+        const x = cx + Math.sin(now * 3 + i) * (w * 0.12)
+        const alpha = Math.pow(1 - t, 1.3) * boostIntensity * 0.9
+
+        this._drawArrow(ctx, x, y, size, color, alpha, 1)
+      }
+    }
+
+    // SLOW — downward arrows (HDR red)
+    if (slowIntensity > 0.02) {
+      const color = `color(display-p3 1 0 0)` // HDR red
+      const pulse = (Math.sin(now * 1.6) + 1) / 2
+
+      for (let i = 0; i < 7; i++) {
+        const phase = (now * 1.8 + i * 0.42) % 2.0
+        const t = phase / 2.0
+
+        const size = arrowBase + pulse * 1.6
+
+        // lowered top-half positions (closer to head)
+        const yStart = cy - h * 0.75 // slightly above head
+        const yEnd = cy - h * 0.2 // upper half
+        const y = yStart + (yEnd - yStart) * t
+
+        const x = cx + Math.cos(now * 2 + i) * (w * 0.15)
+        const alpha = Math.pow(1 - t, 1.35) * slowIntensity * 0.9
+
+        this._drawArrow(ctx, x, y, size, color, alpha, -1)
+      }
+    }
+
+    ctx.restore()
   }
 
-  // ──────────────────────────────
-  // 2b. BOOST FORWARD TRAIL (mirror of slow but slightly ahead; kept close)
-  // ──────────────────────────────
-  if (isBoosted && boostIntensity > 0.05) {
-    ctx.shadowBlur = 22
-    ctx.shadowColor = `color(display-p3 0 1 1)` // cyan-ish glow
+  /**
+   * Draws the collision box for debugging purposes.
+   *
+   * @access private
+   */
+  _drawCollisionBox(player, camera) {
+    const ctx = this._ctx
+    const scale = SpriteConfig.Scale
+    const sx = player.x
+    const sy = player.y
 
-    const boostGhosts = 3
-    for (let i = 1; i <= boostGhosts; i++) {
-      const idx = Math.max(0, player._posHistory.length - 1 - i * 1)
-      const ghost = player._posHistory[idx]
-      if (!ghost) continue
+    // Match the collision calculation from world.js
+    const cx = sx + (SpriteConfig.Width * scale) / 2
+    const bottomY =
+      sy + SpriteConfig.Height * scale - CollisionConfig.VerticalOffset
+    const halfWidth = CollisionConfig.Width / 2
 
-      // Make them slightly forward relative to the ghost point.
-      // Combine a small constant forward offset with a velocity-based nudge
-      const forwardConst = i * 4           // small guaranteed forward offset
-      const forwardVel = (vx || 0) * (i * 0.25) // small velocity contribution
-      const drawX = ghost.x + forwardConst + forwardVel
-      const drawY = ghost.y
+    const left = cx - halfWidth
+    const right = cx + halfWidth
+    const top = bottomY
+    const bottom = bottomY + CollisionConfig.Height
 
-      const alpha = (1 - i / (boostGhosts + 1)) * 0.22 * boostIntensity
-      ctx.globalAlpha = alpha
+    // Convert to screen coordinates
+    const screenLeft = left - camera.x
+    const screenRight = right - camera.x
+    const screenTop = top - camera.y
+    const screenBottom = bottom - camera.y
 
-      ctx.drawImage(
-        this._sheet,
-        ghost.frame * SpriteConfig.Width,
-        (player.direction || 0) * SpriteConfig.Height,
-        SpriteConfig.Width,
-        SpriteConfig.Height,
-        drawX,
-        drawY,
-        w,
-        h
-      )
-    }
+    ctx.save()
 
-    // Short, subtle speed-lines pointing forward (tied to velocity magnitude)
-    const speed = Math.hypot(vx || 0, vy || 0)
-    const lineCount = 3
+    // Draw the collision box outline (slightly transparent)
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'
     ctx.lineWidth = 2
-    ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.45, 0.18 + 0.3 * boostIntensity)})`
+    ctx.strokeRect(
+      screenLeft,
+      screenTop,
+      CollisionConfig.Width,
+      CollisionConfig.Height
+    )
 
-    for (let i = 0; i < lineCount; i++) {
-      // random small jitter but keep lines close to player
-      const offsetX = (Math.random() - 0.5) * w * 0.28
-      const offsetY = (Math.random() - 0.5) * h * 0.18
+    // Draw corner markers for the four collision check points
+    const cornerSize = 4
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.6)'
 
-      const len = 6 + Math.min(12, speed * 0.6) // short, grows a bit with speed
-      ctx.beginPath()
-      ctx.moveTo(cx + offsetX, cy + offsetY)
-      ctx.lineTo(cx + offsetX + (vx || 1) * (len * 0.12) + len * 0.6, cy + offsetY + (vy || 0) * (len * 0.12))
-      ctx.stroke()
-    }
+    // Top-left corner
+    ctx.fillRect(
+      screenLeft - cornerSize / 2,
+      screenTop - cornerSize / 2,
+      cornerSize,
+      cornerSize
+    )
+    // Top-right corner
+    ctx.fillRect(
+      screenRight - cornerSize / 2,
+      screenTop - cornerSize / 2,
+      cornerSize,
+      cornerSize
+    )
+    // Bottom-left corner
+    ctx.fillRect(
+      screenLeft - cornerSize / 2,
+      screenBottom - cornerSize / 2,
+      cornerSize,
+      cornerSize
+    )
+    // Bottom-right corner
+    ctx.fillRect(
+      screenRight - cornerSize / 2,
+      screenBottom - cornerSize / 2,
+      cornerSize,
+      cornerSize
+    )
+
+    ctx.restore()
   }
-
-  // ──────────────────────────────
-  // 3. ARROWS — BOOST UP, SLOW DOWN (top/head area; kept smaller & lower)
-  // ──────────────────────────────
-
-  // Shared arrow sizing (smaller)
-  const arrowBase = w * 0.18
-
-  // BOOST — upward arrows (HDR green)
-  if (boostIntensity > 0.02) {
-  const color = `color(display-p3 0 1 0)` // HDR green
-  const pulse = (Math.sin(now * 4) + 1) / 2
-
-  for (let i = 0; i < 7; i++) {
-    const phase = (now * 2.5 + i * 0.35) % 1.6
-    const t = phase / 1.6
-
-    const size = arrowBase + pulse * 2
-
-    // Match slow arrow vertical range
-    const yStart = cy - h * 0.75  // slightly above head
-    const yEnd = cy - h * 0.20    // upper half
-    const y = yStart + (yEnd - yStart) * t
-
-    const x = cx + Math.sin(now * 3 + i) * (w * 0.12)
-    const alpha = Math.pow(1 - t, 1.3) * boostIntensity * 0.9
-
-    this._drawArrow(ctx, x, y, size, color, alpha, 1)
-  }
-}
-
-  // SLOW — downward arrows (HDR red)
-  if (slowIntensity > 0.02) {
-    const color = `color(display-p3 1 0 0)` // HDR red
-    const pulse = (Math.sin(now * 1.6) + 1) / 2
-
-    for (let i = 0; i < 7; i++) {
-      const phase = (now * 1.8 + i * 0.42) % 2.0
-      const t = phase / 2.0
-
-      const size = arrowBase + pulse * 1.6
-
-      // lowered top-half positions (closer to head)
-      const yStart = cy - h * 0.75   // slightly above head
-      const yEnd = cy - h * 0.20     // upper half
-      const y = yStart + (yEnd - yStart) * t
-
-      const x = cx + Math.cos(now * 2 + i) * (w * 0.15)
-      const alpha = Math.pow(1 - t, 1.35) * slowIntensity * 0.9
-
-      this._drawArrow(ctx, x, y, size, color, alpha, -1)
-    }
-  }
-
-  ctx.restore()
-}
-
 
   /**
    * Renders floating text particles.
