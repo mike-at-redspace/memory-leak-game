@@ -4,6 +4,7 @@ import {
   Fonts,
   ScreenConfig,
   PhysicsConfig,
+  StatsConfig,
   TileTypes,
   SpriteConfig,
   ParticleConfig,
@@ -497,9 +498,16 @@ export class Renderer {
         )
 
     // --- Maintain a small position history on the player object for consistent trails
-    // Keep these lightweight: only store screen-space px/py and frame
+    // Store world coordinates for accurate velocity calculation
     if (!player._posHistory) player._posHistory = []
-    player._posHistory.push({ x: px, y: py, frame: player.frame, t: now })
+    player._posHistory.push({
+      x: player.x,
+      y: player.y,
+      screenX: px,
+      screenY: py,
+      frame: player.frame,
+      t: now
+    })
     // cap history length
     if (
       player._posHistory.length > PlayerVisualConfig.PositionHistory.MaxLength
@@ -507,13 +515,14 @@ export class Renderer {
       player._posHistory.shift()
     }
 
-    // best-effort velocity fallback (pixels per frame-ish)
+    // Calculate velocity from world coordinates (not screen coordinates)
     const prev =
       player._posHistory.length >= 2
         ? player._posHistory[player._posHistory.length - 2]
         : null
-    const vx = player.vx != null ? player.vx : prev ? px - prev.x : 0
-    const vy = player.vy != null ? player.vy : prev ? py - prev.y : 0
+    const dt = prev ? now - prev.t : 0
+    const vx = prev && dt > 0 ? (player.x - prev.x) / dt : 0
+    const vy = prev && dt > 0 ? (player.y - prev.y) / dt : 0
 
     // Calculate normalized movement direction for trail effects
     const speed = Math.hypot(vx, vy)
@@ -543,6 +552,11 @@ export class Renderer {
       }
     }
 
+    // Calculate normalized speed (0 to 1) for trail ghost count scaling
+    // Max speed is BaseSpeed * SpeedBoostMultiplier
+    const maxSpeed = PhysicsConfig.BaseSpeed * StatsConfig.SpeedBoostMultiplier
+    const normalizedSpeed = Math.min(1, Math.max(0, speed / maxSpeed))
+
     ctx.save()
 
     // ──────────────────────────────
@@ -553,135 +567,129 @@ export class Renderer {
     // Slow trail (ahead of player - forward)
     if (
       isSlowed &&
-      slowIntensity > PlayerVisualConfig.SlowTransition.IntensityThreshold
+      slowIntensity > PlayerVisualConfig.SlowTransition.IntensityThreshold &&
+      speed > minSpeedThreshold
     ) {
       ctx.shadowBlur = trailConfig.ShadowBlur
       ctx.shadowColor = PlayerVisualConfig.SlowTrail.ShadowColor
 
-      const trailGhosts = trailConfig.GhostCount
-      for (let i = 1; i <= trailGhosts; i++) {
-        const idx = Math.max(
-          0,
-          player._posHistory.length -
-            1 -
-            i * PlayerVisualConfig.PositionHistory.Step
-        )
-        const ghost = player._posHistory[idx]
-        if (!ghost) continue
+      // Scale ghost count based on movement speed, maxing at config value
+      const trailGhosts = Math.floor(trailConfig.GhostCount * normalizedSpeed)
+      if (trailGhosts > 0) {
+        for (let i = 1; i <= trailGhosts; i++) {
+          const idx = Math.max(
+            0,
+            player._posHistory.length -
+              1 -
+              i * PlayerVisualConfig.PositionHistory.Step
+          )
+          const ghost = player._posHistory[idx]
+          if (!ghost) continue
 
-        // Offset in movement direction (ahead of movement)
-        const offsetMagnitude = i * trailConfig.ForwardDistance
-        const offsetX = dirX * offsetMagnitude
-        const offsetY = dirY * offsetMagnitude
+          // Use screen coordinates from history for rendering
+          const ghostScreenX = ghost.screenX
+          const ghostScreenY = ghost.screenY
 
-        // Add velocity-based nudge
-        const velX = (vx || 0) * (i * trailConfig.ForwardVelMultiplier)
-        const velY = (vy || 0) * (i * trailConfig.ForwardVelMultiplier)
+          // Offset in movement direction (ahead of movement)
+          const offsetMagnitude = i * trailConfig.ForwardDistance
+          const offsetX = dirX * offsetMagnitude
+          const offsetY = dirY * offsetMagnitude
 
-        const drawX = ghost.x + offsetX + velX
-        const drawY = ghost.y + offsetY + velY
+          // Add velocity-based nudge (convert world velocity to screen space)
+          const velX = (vx || 0) * (i * trailConfig.ForwardVelMultiplier)
+          const velY = (vy || 0) * (i * trailConfig.ForwardVelMultiplier)
 
-        const alpha =
-          (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * slowIntensity
-        ctx.globalAlpha = alpha
+          // Stagger effect: offset perpendicular to movement direction
+          const staggerAmount = (i % 2 === 0 ? 1 : -1) * 2
+          const perpX = -dirY * staggerAmount
+          const perpY = dirX * staggerAmount
 
-        ctx.drawImage(
-          this._sheet,
-          ghost.frame * SpriteConfig.Width,
-          (player.direction || 0) * SpriteConfig.Height,
-          SpriteConfig.Width,
-          SpriteConfig.Height,
-          drawX,
-          drawY,
-          w,
-          h
-        )
+          const drawX = ghostScreenX + offsetX + velX + perpX
+          const drawY = ghostScreenY + offsetY + velY + perpY
+
+          const alpha =
+            (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * slowIntensity
+          ctx.globalAlpha = alpha
+
+          ctx.drawImage(
+            this._sheet,
+            ghost.frame * SpriteConfig.Width,
+            (player.direction || 0) * SpriteConfig.Height,
+            SpriteConfig.Width,
+            SpriteConfig.Height,
+            drawX,
+            drawY,
+            w,
+            h
+          )
+        }
       }
     }
 
     // Boost trail (behind player - backward)
     if (
       isBoosted &&
-      boostIntensity > PlayerVisualConfig.BoostTransition.IntensityThreshold
+      boostIntensity > PlayerVisualConfig.BoostTransition.IntensityThreshold &&
+      speed > minSpeedThreshold
     ) {
       ctx.shadowBlur = trailConfig.ShadowBlur
       ctx.shadowColor = trailConfig.ShadowColor
 
-      const trailGhosts = trailConfig.GhostCount
-      for (let i = 1; i <= trailGhosts; i++) {
-        const idx = Math.max(
-          0,
-          player._posHistory.length -
-            1 -
-            i * PlayerVisualConfig.PositionHistory.Step
-        )
-        const ghost = player._posHistory[idx]
-        if (!ghost) continue
-
-        // Offset behind movement direction (opposite to movement)
-        const offsetMagnitude = i * trailConfig.ForwardDistance
-        const offsetX = -dirX * offsetMagnitude
-        const offsetY = -dirY * offsetMagnitude
-
-        // Add velocity-based nudge (reversed for boost)
-        const velX = (vx || 0) * (i * trailConfig.ForwardVelMultiplier)
-        const velY = (vy || 0) * (i * trailConfig.ForwardVelMultiplier)
-
-        const drawX = ghost.x + offsetX - velX
-        const drawY = ghost.y + offsetY - velY
-
-        const alpha =
-          (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * boostIntensity
-        ctx.globalAlpha = alpha
-
-        ctx.drawImage(
-          this._sheet,
-          ghost.frame * SpriteConfig.Width,
-          (player.direction || 0) * SpriteConfig.Height,
-          SpriteConfig.Width,
-          SpriteConfig.Height,
-          drawX,
-          drawY,
-          w,
-          h
-        )
-      }
-
-      // Short, subtle speed-lines pointing forward (tied to velocity magnitude)
-      const speedLinesConfig = PlayerVisualConfig.SpeedLines
-      // Reuse the speed variable already calculated above
-      ctx.lineWidth = speedLinesConfig.Width
-      ctx.strokeStyle = `rgba(255,255,255,${Math.min(
-        speedLinesConfig.AlphaMax,
-        speedLinesConfig.AlphaBase +
-          speedLinesConfig.AlphaBoostMultiplier * boostIntensity
-      )})`
-
-      for (let i = 0; i < speedLinesConfig.Count; i++) {
-        // random small jitter but keep lines close to player
-        const offsetX =
-          (Math.random() - 0.5) * w * speedLinesConfig.OffsetXMultiplier
-        const offsetY =
-          (Math.random() - 0.5) * h * speedLinesConfig.OffsetYMultiplier
-
-        const len =
-          speedLinesConfig.BaseLength +
-          Math.min(
-            speedLinesConfig.MaxLength,
-            speed * speedLinesConfig.LengthSpeedMultiplier
+      // Scale ghost count based on movement speed, maxing at config value
+      const trailGhosts = Math.floor(trailConfig.GhostCount * normalizedSpeed)
+      if (trailGhosts > 0) {
+        for (let i = 1; i <= trailGhosts; i++) {
+          const idx = Math.max(
+            0,
+            player._posHistory.length -
+              1 -
+              i * PlayerVisualConfig.PositionHistory.Step
           )
-        ctx.beginPath()
-        ctx.moveTo(cx + offsetX, cy + offsetY)
-        ctx.lineTo(
-          cx +
-            offsetX +
-            (vx || 1) * (len * speedLinesConfig.LengthDirMultiplier) +
-            len * speedLinesConfig.LengthForwardMultiplier,
-          cy +
-            offsetY +
-            (vy || 0) * (len * speedLinesConfig.LengthDirMultiplier)
-        )
-        ctx.stroke()
+          const ghost = player._posHistory[idx]
+          if (!ghost) continue
+
+          // Use screen coordinates from history for rendering
+          const ghostScreenX = ghost.screenX
+          const ghostScreenY = ghost.screenY
+
+          // Offset behind movement direction (opposite to movement)
+          // Scale down offset for boost trails to match slow trail visual distance
+          const speedScale = isBoosted ? 1 / (player.multiplier * 1.5) : 1
+          const offsetMagnitude = i * trailConfig.ForwardDistance * speedScale
+          const offsetX = -dirX * offsetMagnitude
+          const offsetY = -dirY * offsetMagnitude
+
+          // Add velocity-based nudge (reversed for boost, convert world velocity to screen space)
+          // Scale down velocity multiplier for boost trails to match slow trail
+          const velX =
+            (vx || 0) * (i * trailConfig.ForwardVelMultiplier * speedScale)
+          const velY =
+            (vy || 0) * (i * trailConfig.ForwardVelMultiplier * speedScale)
+
+          // Stagger effect: offset perpendicular to movement direction
+          const staggerAmount = (i % 2 === 0 ? 1 : -1) * 2
+          const perpX = -dirY * staggerAmount
+          const perpY = dirX * staggerAmount
+
+          const drawX = ghostScreenX + offsetX - velX + perpX
+          const drawY = ghostScreenY + offsetY - velY + perpY
+
+          const alpha =
+            (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * boostIntensity
+          ctx.globalAlpha = alpha
+
+          ctx.drawImage(
+            this._sheet,
+            ghost.frame * SpriteConfig.Width,
+            (player.direction || 0) * SpriteConfig.Height,
+            SpriteConfig.Width,
+            SpriteConfig.Height,
+            drawX,
+            drawY,
+            w,
+            h
+          )
+        }
       }
     }
 

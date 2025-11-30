@@ -239,20 +239,6 @@ export const LayoutConfig = Object.freeze({
  *     ForwardDistance: number
  *     ForwardVelMultiplier: number
  *   }
- *   SpeedLines: {
- *     Count: number
- *     Width: number
- *     AlphaBase: number
- *     AlphaMax: number
- *     AlphaBoostMultiplier: number
- *     OffsetXMultiplier: number
- *     OffsetYMultiplier: number
- *     BaseLength: number
- *     MaxLength: number
- *     LengthSpeedMultiplier: number
- *     LengthDirMultiplier: number
- *     LengthForwardMultiplier: number
- *   }
  *   Arrows: {
  *     BaseSizeMultiplier: number
  *     BoostColor: string
@@ -293,24 +279,10 @@ export const PlayerVisualConfig = Object.freeze({
   BoostTrail: {
     ShadowBlur: 32,
     ShadowColor: 'rbga(255, 255, 255, 0.75)',
-    GhostCount: 5,
-    AlphaBase: 0.15,
-    ForwardDistance: 10,
-    ForwardVelMultiplier: 0.25
-  },
-  SpeedLines: {
-    Count: 5,
-    Width: 4,
-    AlphaBase: 0.18,
-    AlphaMax: 0.45,
-    AlphaBoostMultiplier: 0.3,
-    OffsetXMultiplier: 0.28,
-    OffsetYMultiplier: 1,
-    BaseLength: 6,
-    MaxLength: 12,
-    LengthSpeedMultiplier: 0.6,
-    LengthDirMultiplier: 0.12,
-    LengthForwardMultiplier: 0.6
+    GhostCount: 4,
+    AlphaBase: 0.125,
+    ForwardDistance: 0.095,
+    ForwardVelMultiplier: 0.095
   },
   Arrows: {
     BaseSizeMultiplier: 0.18,

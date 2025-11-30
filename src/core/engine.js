@@ -212,8 +212,8 @@ export class GameEngine {
   /**
    * Checks for item collisions using the player's collision box.
    *
-   * @access private
    * @returns {void}
+   * @access private
    */
   _checkCollisions() {
     // Calculate player's collision box (matching world.js checkCollision logic)
