@@ -254,69 +254,38 @@ export class TouchGamepad {
 
   /**
    * Repositions the gamepad based on current fullscreen state.
+   * Keeps the gamepad in document.body with position: fixed, which works in
+   * fullscreen.
    *
    * @access private
    */
   _repositionGamepad() {
     if (!this.canvas) return
 
-    const fullscreenElement =
-      document.fullscreenElement ||
-      document.webkitFullscreenElement ||
-      document.mozFullScreenElement ||
-      document.msFullscreenElement
+    // Ensure gamepad is always in document.body (not moved to fullscreen element)
+    if (this.canvas.parentNode !== document.body) {
+      // Store current display state
+      const wasVisible = this.canvas.style.display !== 'none'
 
-    if (fullscreenElement) {
-      // Entering fullscreen - move gamepad into fullscreen element
-      // Check if gamepad should be visible (only if in playing state)
-      const shouldBeVisible = this.canvas.style.display !== 'none'
+      // Move back to body if it was moved elsewhere
+      document.body.appendChild(this.canvas)
 
-      if (this.canvas.parentNode !== fullscreenElement) {
-        // Store current display state
-        const wasVisible = this.canvas.style.display !== 'none'
+      // Reapply styles to ensure they're preserved
+      this._applyStyles()
 
-        // Move to fullscreen element
-        fullscreenElement.appendChild(this.canvas)
-
-        // Reapply styles to ensure they're preserved
-        this._applyStyles()
-
-        // Restore visibility
-        if (wasVisible) {
-          this.canvas.style.display = 'block'
-          this.canvas.style.visibility = 'visible'
-        }
-
-        // Redraw to ensure it's visible
-        this.draw()
-      } else {
-        // Already in fullscreen element, just ensure visibility and styles
-        this._applyStyles()
-        if (shouldBeVisible) {
-          this.canvas.style.display = 'block'
-          this.canvas.style.visibility = 'visible'
-          this.draw()
-        }
+      // Restore visibility
+      if (wasVisible) {
+        this.canvas.style.display = 'block'
+        this.canvas.style.visibility = 'visible'
       }
+
+      // Redraw to ensure it's visible
+      this.draw()
     } else {
-      // Exiting fullscreen - move gamepad back to body
-      if (this.canvas.parentNode !== document.body) {
-        // Store current display state
-        const wasVisible = this.canvas.style.display !== 'none'
-
-        // Move back to body
-        document.body.appendChild(this.canvas)
-
-        // Reapply styles
-        this._applyStyles()
-
-        // Restore visibility
-        if (wasVisible) {
-          this.canvas.style.display = 'block'
-          this.canvas.style.visibility = 'visible'
-        }
-
-        // Redraw
+      // Already in body, just ensure styles are correct
+      this._applyStyles()
+      // Redraw if visible
+      if (this.canvas.style.display !== 'none') {
         this.draw()
       }
     }
@@ -324,6 +293,7 @@ export class TouchGamepad {
 
   /**
    * Applies standard styles to the gamepad canvas.
+   * Uses position: fixed which works correctly in fullscreen mode.
    *
    * @access private
    */
@@ -334,7 +304,8 @@ export class TouchGamepad {
     this.canvas.style.left = '20px'
     this.canvas.style.width = '120px'
     this.canvas.style.height = '120px'
-    this.canvas.style.zIndex = '9999'
+    // Use a very high z-index to ensure it appears above fullscreen canvas
+    this.canvas.style.zIndex = '2147483647'
     this.canvas.style.pointerEvents = 'auto'
     this.canvas.style.touchAction = 'none'
     this.canvas.style.borderRadius = '50%'

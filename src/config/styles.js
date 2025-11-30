@@ -111,7 +111,7 @@ export const HudConfig = Object.freeze({
   gridItemDimAlpha: 0.2,
   healthCriticalThreshold: 0.25,
   healthWarningThreshold: 0.5,
-  messageFadeDuration: 500,
+  messageFadeDuration: 900,
   textVerticalOffset: 2,
   gridPulseDuration: 450,
   gridPulseMaxScale: 0.55,
@@ -188,9 +188,9 @@ export const LayoutConfig = Object.freeze({
   // Collection grid
   gridHeaderY: 28,
   gridItemStartY: 60,
-  gridColumns: 5,
-  gridRowHeight: 40,
-  gridBaseHeight: 52,
+  gridColumns: 4,
+  gridRowHeight: 42,
+  gridBaseHeight: 48,
   gridItemPadding: 18,
 
   // Memory bar

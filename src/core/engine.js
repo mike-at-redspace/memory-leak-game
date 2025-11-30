@@ -67,16 +67,14 @@ export class GameEngine {
     this.world = new World()
     this.player = new Player()
 
-    this.camera = new Camera({
-      viewport: () => ({
-        width: this.window.innerWidth,
-        height: this.window.innerHeight
-      })
-    })
-
     this.renderer = new Renderer(this.canvas, {
       windowRef: this.window,
       documentRef: this.document
+    })
+
+    // Camera uses renderer's effective viewport to show more world on mobile
+    this.camera = new Camera({
+      viewport: () => this.renderer.getEffectiveViewport()
     })
 
     this.particles = new FloatingTextSystem()

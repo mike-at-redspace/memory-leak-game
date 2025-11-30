@@ -126,9 +126,28 @@ export class Renderer {
 
     // Bind resize handler
     this._boundResize = this._resize.bind(this)
+    this._boundFullscreenChange = this._handleFullscreenChange.bind(this)
     this._setupFonts()
     this._resize()
     this._window.addEventListener('resize', this._boundResize)
+
+    // Listen for fullscreen changes to recalculate scaling
+    this._document.addEventListener(
+      'fullscreenchange',
+      this._boundFullscreenChange
+    )
+    this._document.addEventListener(
+      'webkitfullscreenchange',
+      this._boundFullscreenChange
+    )
+    this._document.addEventListener(
+      'mozfullscreenchange',
+      this._boundFullscreenChange
+    )
+    this._document.addEventListener(
+      'MSFullscreenChange',
+      this._boundFullscreenChange
+    )
   }
 
   /**
@@ -148,15 +167,35 @@ export class Renderer {
    */
   dispose() {
     this._window.removeEventListener('resize', this._boundResize)
+    if (this._boundFullscreenChange) {
+      this._document.removeEventListener(
+        'fullscreenchange',
+        this._boundFullscreenChange
+      )
+      this._document.removeEventListener(
+        'webkitfullscreenchange',
+        this._boundFullscreenChange
+      )
+      this._document.removeEventListener(
+        'mozfullscreenchange',
+        this._boundFullscreenChange
+      )
+      this._document.removeEventListener(
+        'MSFullscreenChange',
+        this._boundFullscreenChange
+      )
+    }
   }
 
   /**
    * Returns the current scaling factor based on screen width.
+   * Uses actual viewport dimensions to account for fullscreen mode.
    *
    * @returns {number}
    */
   get scaleFactor() {
-    const width = this._canvas.width
+    // Use actual viewport width (accounts for fullscreen)
+    const width = this._getViewportWidth()
     // Scale down for mobile devices under 768px (more zoomed out)
     if (width < 768) {
       // Scale proportionally: 0.3x at 320px, 0.45x at 640px, 0.6x at 768px
@@ -172,6 +211,54 @@ export class Renderer {
       return ScreenConfig.LargeScale * scaleMultiplier
     }
     return ScreenConfig.BaseScale
+  }
+
+  /**
+   * Gets the current viewport width, accounting for fullscreen mode.
+   *
+   * @returns {number}
+   * @access private
+   */
+  _getViewportWidth() {
+    // Check if in fullscreen mode
+    const fullscreenElement =
+      this._document.fullscreenElement ||
+      this._document.webkitFullscreenElement ||
+      this._document.mozFullScreenElement ||
+      this._document.msFullscreenElement
+
+    if (fullscreenElement) {
+      // In fullscreen, use the fullscreen element's dimensions
+      return fullscreenElement.clientWidth || this._window.innerWidth
+    }
+    // Not in fullscreen, use window dimensions
+    return this._window.innerWidth
+  }
+
+  /**
+   * Gets the effective viewport dimensions for camera calculations.
+   * On mobile, returns scaled-up dimensions to show more of the world.
+   *
+   * @returns {{ width: number; height: number }}
+   */
+  getEffectiveViewport() {
+    const width = this._getViewportWidth()
+    const height = this._getViewportHeight()
+
+    // On mobile (under 768px), scale up the effective viewport
+    // This makes the camera show more of the world (zoom out effect)
+    if (width < 768) {
+      const scale = this.scaleFactor
+      // Inverse scale: if visual scale is 0.6x, effective viewport is 1/0.6 = 1.67x
+      // This shows more world area on screen
+      const effectiveScale = 1 / scale
+      return {
+        width: width * effectiveScale,
+        height: height * effectiveScale
+      }
+    }
+
+    return { width, height }
   }
 
   /**
@@ -240,13 +327,13 @@ export class Renderer {
     this._renderParticles(particles, camera)
 
     // Calculate HUD scale factor
-    // On mobile, scale HUD down proportionally but not as much as the world
+    // On mobile, scale HUD down more aggressively to show more world
     let hudScale = this.scaleFactor
     if (width < 768) {
-      // Scale HUD down for mobile, but use a smaller reduction than world
-      // This keeps HUD readable but not too large
-      hudScale = 0.7 + ((width - 320) / (768 - 320)) * 0.2 // 0.7x to 0.9x
-      hudScale = Math.max(0.7, Math.min(0.9, hudScale))
+      // Scale HUD down more on mobile: 0.5x at 320px, 0.6x at 640px, 0.7x at 768px
+      // This makes the HUD smaller to maximize world visibility
+      hudScale = 0.5 + ((width - 320) / (768 - 320)) * 0.2 // 0.5x to 0.7x
+      hudScale = Math.max(0.5, Math.min(0.7, hudScale))
     }
 
     this._hudRenderer.render(
@@ -1054,8 +1141,9 @@ export class Renderer {
    * @access private
    */
   _resize() {
-    const width = this._window.innerWidth
-    const height = this._window.innerHeight
+    // Use viewport width that accounts for fullscreen
+    const width = this._getViewportWidth()
+    const height = this._getViewportHeight()
 
     // Set internal canvas resolution (always full size)
     this._canvas.width = width
@@ -1071,6 +1159,42 @@ export class Renderer {
       // Reset scaling for larger screens
       this._canvas.style.transform = 'none'
     }
+  }
+
+  /**
+   * Gets the current viewport height, accounting for fullscreen mode.
+   *
+   * @returns {number}
+   * @access private
+   */
+  _getViewportHeight() {
+    // Check if in fullscreen mode
+    const fullscreenElement =
+      this._document.fullscreenElement ||
+      this._document.webkitFullscreenElement ||
+      this._document.mozFullScreenElement ||
+      this._document.msFullscreenElement
+
+    if (fullscreenElement) {
+      // In fullscreen, use the fullscreen element's dimensions
+      return fullscreenElement.clientHeight || this._window.innerHeight
+    }
+    // Not in fullscreen, use window dimensions
+    return this._window.innerHeight
+  }
+
+  /**
+   * Handles fullscreen changes to recalculate scaling.
+   *
+   * @access private
+   */
+  _handleFullscreenChange() {
+    // Wait for fullscreen transition to complete, then recalculate
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        this._resize()
+      })
+    })
   }
 
   /**
