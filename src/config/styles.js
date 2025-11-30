@@ -219,6 +219,119 @@ export const LayoutConfig = Object.freeze({
   buttonRadius: 8
 })
 
+/**
+ * Player visual effects configuration for trails, arrows, and transitions.
+ *
+ * @type {Readonly<{
+ *   PositionHistory: { MaxLength: number; Step: number }
+ *   BoostTransition: {
+ *     FadeInDuration: number
+ *     FadeOutDuration: number
+ *     IntensityThreshold: number
+ *   }
+ *   SlowTransition: { FadeOutDuration: number; IntensityThreshold: number }
+ *   SlowTrail: { ShadowColor: string }
+ *   BoostTrail: {
+ *     ShadowBlur: number
+ *     ShadowColor: string
+ *     GhostCount: number
+ *     AlphaBase: number
+ *     ForwardDistance: number
+ *     ForwardVelMultiplier: number
+ *   }
+ *   SpeedLines: {
+ *     Count: number
+ *     Width: number
+ *     AlphaBase: number
+ *     AlphaMax: number
+ *     AlphaBoostMultiplier: number
+ *     OffsetXMultiplier: number
+ *     OffsetYMultiplier: number
+ *     BaseLength: number
+ *     MaxLength: number
+ *     LengthSpeedMultiplier: number
+ *     LengthDirMultiplier: number
+ *     LengthForwardMultiplier: number
+ *   }
+ *   Arrows: {
+ *     BaseSizeMultiplier: number
+ *     BoostColor: string
+ *     SlowColor: string
+ *     BoostPulseSpeed: number
+ *     SlowPulseSpeed: number
+ *     PulseAmplitude: number
+ *     Count: number
+ *     PhaseSpeed: number
+ *     PhaseIncrement: number
+ *     PhaseRange: number
+ *     YStartMultiplier: number
+ *     YEndMultiplier: number
+ *     XSpreadMultiplier: number
+ *     AlphaPower: number
+ *     AlphaMultiplier: number
+ *     IntensityThreshold: number
+ *   }
+ * }>}
+ */
+export const PlayerVisualConfig = Object.freeze({
+  PositionHistory: {
+    MaxLength: 12,
+    Step: 1
+  },
+  BoostTransition: {
+    FadeInDuration: 1.2,
+    FadeOutDuration: 0.7,
+    IntensityThreshold: 0.05
+  },
+  SlowTransition: {
+    FadeOutDuration: 0.8,
+    IntensityThreshold: 0.05
+  },
+  SlowTrail: {
+    ShadowColor: 'color(display-p3 1 0.5 0.5)'
+  },
+  BoostTrail: {
+    ShadowBlur: 32,
+    ShadowColor: 'rbga(255, 255, 255, 0.75)',
+    GhostCount: 5,
+    AlphaBase: 0.15,
+    ForwardDistance: 10,
+    ForwardVelMultiplier: 0.25
+  },
+  SpeedLines: {
+    Count: 5,
+    Width: 4,
+    AlphaBase: 0.18,
+    AlphaMax: 0.45,
+    AlphaBoostMultiplier: 0.3,
+    OffsetXMultiplier: 0.28,
+    OffsetYMultiplier: 1,
+    BaseLength: 6,
+    MaxLength: 12,
+    LengthSpeedMultiplier: 0.6,
+    LengthDirMultiplier: 0.12,
+    LengthForwardMultiplier: 0.6
+  },
+  Arrows: {
+    BaseSizeMultiplier: 0.18,
+    BoostColor: 'color(display-p3 0 1 0)',
+    SlowColor: 'color(display-p3 1 0 0)',
+    BoostPulseSpeed: 2,
+    SlowPulseSpeed: 1,
+    PulseAmplitude: 2,
+    Count: 3,
+    PhaseSpeed: 2.5,
+    PhaseIncrement: 1.2,
+    PhaseRange: 1.6,
+    YStartMultiplier: -0.75,
+    YEndMultiplier: -0.2,
+    XSpreadMultiplier: 0.12,
+    AlphaPower: 1.3,
+    AlphaMultiplier: 0.9,
+    IntensityThreshold: 0.02
+  }
+})
+
 /** Aggregates UI-facing constants to simplify consumer imports. */
 export const UIConfig = Object.freeze({
   Screen: ScreenConfig,

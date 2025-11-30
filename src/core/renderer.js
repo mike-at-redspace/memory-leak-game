@@ -9,7 +9,9 @@ import {
   ParticleConfig,
   ItemOutlineColors,
   LevelThemes,
-  CollisionConfig
+  CollisionConfig,
+  PlayerVisualConfig,
+  Directions
 } from '../config/index.js'
 import { HudRenderer } from './ui/hud.js'
 import { defaultDocument, defaultWindow } from '../utils/environment.js'
@@ -473,19 +475,36 @@ export class Renderer {
     // Smooth transitions
     const boostAge = now - (player.boostStartTime || 0)
     const boostIntensity = isBoosted
-      ? Math.min(1, boostAge / 1.2)
-      : Math.max(0, 1 - (now - (player.boostEndTime || 0)) / 0.7)
+      ? Math.min(
+          1,
+          boostAge / PlayerVisualConfig.BoostTransition.FadeInDuration
+        )
+      : Math.max(
+          0,
+          1 -
+            (now - (player.boostEndTime || 0)) /
+              PlayerVisualConfig.BoostTransition.FadeOutDuration
+        )
 
     const slowIntensity = isSlowed
       ? 1
-      : Math.max(0, 1 - (now - (player.slowEndTime || 0)) / 0.8)
+      : Math.max(
+          0,
+          1 -
+            (now - (player.slowEndTime || 0)) /
+              PlayerVisualConfig.SlowTransition.FadeOutDuration
+        )
 
     // --- Maintain a small position history on the player object for consistent trails
     // Keep these lightweight: only store screen-space px/py and frame
     if (!player._posHistory) player._posHistory = []
     player._posHistory.push({ x: px, y: py, frame: player.frame, t: now })
     // cap history length
-    if (player._posHistory.length > 12) player._posHistory.shift()
+    if (
+      player._posHistory.length > PlayerVisualConfig.PositionHistory.MaxLength
+    ) {
+      player._posHistory.shift()
+    }
 
     // best-effort velocity fallback (pixels per frame-ish)
     const prev =
@@ -494,6 +513,34 @@ export class Renderer {
         : null
     const vx = player.vx != null ? player.vx : prev ? px - prev.x : 0
     const vy = player.vy != null ? player.vy : prev ? py - prev.y : 0
+
+    // Calculate normalized movement direction for trail effects
+    const speed = Math.hypot(vx, vy)
+    const minSpeedThreshold = 0.1 // Minimum speed to use movement direction
+    let dirX = 0
+    let dirY = 0
+
+    if (speed > minSpeedThreshold) {
+      dirX = vx / speed
+      dirY = vy / speed
+    } else {
+      // Fallback to player's facing direction when moving too slowly
+      const facingDir = player.direction ?? Directions.DOWN
+      if (facingDir === Directions.UP) {
+        dirX = 0
+        dirY = -1
+      } else if (facingDir === Directions.RIGHT) {
+        dirX = 1
+        dirY = 0
+      } else if (facingDir === Directions.DOWN) {
+        dirX = 0
+        dirY = 1
+      } else {
+        // LEFT
+        dirX = -1
+        dirY = 0
+      }
+    }
 
     ctx.save()
 
@@ -521,61 +568,92 @@ export class Renderer {
     }
 
     // ──────────────────────────────
-    // 2. SLOW LAG TRAIL (behind; uses older history entries)
+    // 2. TRAIL EFFECTS (boost forward, slow backward)
     // ──────────────────────────────
-    if (isSlowed && slowIntensity > 0.05) {
-      ctx.shadowBlur = 20
-      ctx.shadowColor = `color(display-p3 1 0.5 0.5)` // soft red glow
+    const trailConfig = PlayerVisualConfig.BoostTrail
 
-      // draw N ghosts using older history entries (older = more lag)
-      const slowGhosts = 3
-      for (let i = 1; i <= slowGhosts; i++) {
-        const idx = Math.max(0, player._posHistory.length - 1 - i * 1) // step 1
+    // Slow trail (ahead of player - forward)
+    if (
+      isSlowed &&
+      slowIntensity > PlayerVisualConfig.SlowTransition.IntensityThreshold
+    ) {
+      ctx.shadowBlur = trailConfig.ShadowBlur
+      ctx.shadowColor = PlayerVisualConfig.SlowTrail.ShadowColor
+
+      const trailGhosts = trailConfig.GhostCount
+      for (let i = 1; i <= trailGhosts; i++) {
+        const idx = Math.max(
+          0,
+          player._posHistory.length -
+            1 -
+            i * PlayerVisualConfig.PositionHistory.Step
+        )
         const ghost = player._posHistory[idx]
         if (!ghost) continue
 
-        // alpha fades with distance in history
-        const alpha = (1 - i / (slowGhosts + 1)) * 0.22 * slowIntensity
+        // Offset in movement direction (ahead of movement)
+        const offsetMagnitude = i * trailConfig.ForwardDistance
+        const offsetX = dirX * offsetMagnitude
+        const offsetY = dirY * offsetMagnitude
+
+        // Add velocity-based nudge
+        const velX = (vx || 0) * (i * trailConfig.ForwardVelMultiplier)
+        const velY = (vy || 0) * (i * trailConfig.ForwardVelMultiplier)
+
+        const drawX = ghost.x + offsetX + velX
+        const drawY = ghost.y + offsetY + velY
+
+        const alpha =
+          (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * slowIntensity
         ctx.globalAlpha = alpha
 
-        // subtle stagger so they don't perfectly overlap
-        const lagX = -i * 6 // consistent backward horizontal offset
-        const lagY = i
         ctx.drawImage(
           this._sheet,
           ghost.frame * SpriteConfig.Width,
           (player.direction || 0) * SpriteConfig.Height,
           SpriteConfig.Width,
           SpriteConfig.Height,
-          ghost.x + lagX,
-          ghost.y + lagY,
+          drawX,
+          drawY,
           w,
           h
         )
       }
     }
 
-    // ──────────────────────────────
-    // 2b. BOOST FORWARD TRAIL (mirror of slow but slightly ahead; kept close)
-    // ──────────────────────────────
-    if (isBoosted && boostIntensity > 0.05) {
-      ctx.shadowBlur = 22
-      ctx.shadowColor = `color(display-p3 0 1 1)` // cyan-ish glow
+    // Boost trail (behind player - backward)
+    if (
+      isBoosted &&
+      boostIntensity > PlayerVisualConfig.BoostTransition.IntensityThreshold
+    ) {
+      ctx.shadowBlur = trailConfig.ShadowBlur
+      ctx.shadowColor = trailConfig.ShadowColor
 
-      const boostGhosts = 3
-      for (let i = 1; i <= boostGhosts; i++) {
-        const idx = Math.max(0, player._posHistory.length - 1 - i * 1)
+      const trailGhosts = trailConfig.GhostCount
+      for (let i = 1; i <= trailGhosts; i++) {
+        const idx = Math.max(
+          0,
+          player._posHistory.length -
+            1 -
+            i * PlayerVisualConfig.PositionHistory.Step
+        )
         const ghost = player._posHistory[idx]
         if (!ghost) continue
 
-        // Make them slightly forward relative to the ghost point.
-        // Combine a small constant forward offset with a velocity-based nudge
-        const forwardConst = i * 4 // small guaranteed forward offset
-        const forwardVel = (vx || 0) * (i * 0.25) // small velocity contribution
-        const drawX = ghost.x + forwardConst + forwardVel
-        const drawY = ghost.y
+        // Offset behind movement direction (opposite to movement)
+        const offsetMagnitude = i * trailConfig.ForwardDistance
+        const offsetX = -dirX * offsetMagnitude
+        const offsetY = -dirY * offsetMagnitude
 
-        const alpha = (1 - i / (boostGhosts + 1)) * 0.22 * boostIntensity
+        // Add velocity-based nudge (reversed for boost)
+        const velX = (vx || 0) * (i * trailConfig.ForwardVelMultiplier)
+        const velY = (vy || 0) * (i * trailConfig.ForwardVelMultiplier)
+
+        const drawX = ghost.x + offsetX - velX
+        const drawY = ghost.y + offsetY - velY
+
+        const alpha =
+          (1 - i / (trailGhosts + 1)) * trailConfig.AlphaBase * boostIntensity
         ctx.globalAlpha = alpha
 
         ctx.drawImage(
@@ -592,22 +670,38 @@ export class Renderer {
       }
 
       // Short, subtle speed-lines pointing forward (tied to velocity magnitude)
-      const speed = Math.hypot(vx || 0, vy || 0)
-      const lineCount = 3
-      ctx.lineWidth = 2
-      ctx.strokeStyle = `rgba(255,255,255,${Math.min(0.45, 0.18 + 0.3 * boostIntensity)})`
+      const speedLinesConfig = PlayerVisualConfig.SpeedLines
+      // Reuse the speed variable already calculated above
+      ctx.lineWidth = speedLinesConfig.Width
+      ctx.strokeStyle = `rgba(255,255,255,${Math.min(
+        speedLinesConfig.AlphaMax,
+        speedLinesConfig.AlphaBase +
+          speedLinesConfig.AlphaBoostMultiplier * boostIntensity
+      )})`
 
-      for (let i = 0; i < lineCount; i++) {
+      for (let i = 0; i < speedLinesConfig.Count; i++) {
         // random small jitter but keep lines close to player
-        const offsetX = (Math.random() - 0.5) * w * 0.28
-        const offsetY = (Math.random() - 0.5) * h * 0.18
+        const offsetX =
+          (Math.random() - 0.5) * w * speedLinesConfig.OffsetXMultiplier
+        const offsetY =
+          (Math.random() - 0.5) * h * speedLinesConfig.OffsetYMultiplier
 
-        const len = 6 + Math.min(12, speed * 0.6) // short, grows a bit with speed
+        const len =
+          speedLinesConfig.BaseLength +
+          Math.min(
+            speedLinesConfig.MaxLength,
+            speed * speedLinesConfig.LengthSpeedMultiplier
+          )
         ctx.beginPath()
         ctx.moveTo(cx + offsetX, cy + offsetY)
         ctx.lineTo(
-          cx + offsetX + (vx || 1) * (len * 0.12) + len * 0.6,
-          cy + offsetY + (vy || 0) * (len * 0.12)
+          cx +
+            offsetX +
+            (vx || 1) * (len * speedLinesConfig.LengthDirMultiplier) +
+            len * speedLinesConfig.LengthForwardMultiplier,
+          cy +
+            offsetY +
+            (vy || 0) * (len * speedLinesConfig.LengthDirMultiplier)
         )
         ctx.stroke()
       }
@@ -617,50 +711,63 @@ export class Renderer {
     // 3. ARROWS — BOOST UP, SLOW DOWN (top/head area; kept smaller & lower)
     // ──────────────────────────────
 
-    // Shared arrow sizing (smaller)
-    const arrowBase = w * 0.18
+    const arrowConfig = PlayerVisualConfig.Arrows
+    const arrowBase = w * arrowConfig.BaseSizeMultiplier
 
     // BOOST — upward arrows (HDR green)
-    if (boostIntensity > 0.02) {
-      const color = `color(display-p3 0 1 0)` // HDR green
-      const pulse = (Math.sin(now * 4) + 1) / 2
+    if (boostIntensity > arrowConfig.IntensityThreshold) {
+      const color = arrowConfig.BoostColor
+      const pulseSpeed = arrowConfig.BoostPulseSpeed
+      const pulse = (Math.sin(now * pulseSpeed) + 1) / 2
 
-      for (let i = 0; i < 7; i++) {
-        const phase = (now * 2.5 + i * 0.35) % 1.6
-        const t = phase / 1.6
+      for (let i = 0; i < arrowConfig.Count; i++) {
+        const phase =
+          (now * arrowConfig.PhaseSpeed + i * arrowConfig.PhaseIncrement) %
+          arrowConfig.PhaseRange
+        const t = phase / arrowConfig.PhaseRange
 
-        const size = arrowBase + pulse * 2
+        const size = arrowBase + pulse * arrowConfig.PulseAmplitude
 
-        // Match slow arrow vertical range
-        const yStart = cy - h * 0.75 // slightly above head
-        const yEnd = cy - h * 0.2 // upper half
+        const yStart = cy + h * arrowConfig.YStartMultiplier
+        const yEnd = cy + h * arrowConfig.YEndMultiplier
         const y = yStart + (yEnd - yStart) * t
 
-        const x = cx + Math.sin(now * 3 + i) * (w * 0.12)
-        const alpha = Math.pow(1 - t, 1.3) * boostIntensity * 0.9
+        const x =
+          cx + Math.sin(now * 3 + i) * (w * arrowConfig.XSpreadMultiplier)
+        const alpha =
+          Math.pow(1 - t, arrowConfig.AlphaPower) *
+          boostIntensity *
+          arrowConfig.AlphaMultiplier
 
         this._drawArrow(ctx, x, y, size, color, alpha, 1)
       }
     }
 
     // SLOW — downward arrows (HDR red)
-    if (slowIntensity > 0.02) {
-      const color = `color(display-p3 1 0 0)` // HDR red
-      const pulse = (Math.sin(now * 1.6) + 1) / 2
+    if (slowIntensity > arrowConfig.IntensityThreshold) {
+      const color = arrowConfig.SlowColor
+      const pulseSpeed = arrowConfig.SlowPulseSpeed
+      const pulse = (Math.sin(now * pulseSpeed) + 1) / 2
 
-      for (let i = 0; i < 7; i++) {
-        const phase = (now * 1.8 + i * 0.42) % 2.0
-        const t = phase / 2.0
+      for (let i = 0; i < arrowConfig.Count; i++) {
+        const phase =
+          (now * arrowConfig.PhaseSpeed + i * arrowConfig.PhaseIncrement) %
+          arrowConfig.PhaseRange
+        const t = phase / arrowConfig.PhaseRange
 
-        const size = arrowBase + pulse * 1.6
+        const size = arrowBase + pulse * arrowConfig.PulseAmplitude
 
-        // lowered top-half positions (closer to head)
-        const yStart = cy - h * 0.75 // slightly above head
-        const yEnd = cy - h * 0.2 // upper half
+        // Use same Y position as boost arrows (above player)
+        const yStart = cy + h * arrowConfig.YStartMultiplier
+        const yEnd = cy + h * arrowConfig.YEndMultiplier
         const y = yStart + (yEnd - yStart) * t
 
-        const x = cx + Math.cos(now * 2 + i) * (w * 0.15)
-        const alpha = Math.pow(1 - t, 1.35) * slowIntensity * 0.9
+        const x =
+          cx + Math.cos(now * 2 + i) * (w * arrowConfig.XSpreadMultiplier)
+        const alpha =
+          Math.pow(1 - t, arrowConfig.AlphaPower) *
+          slowIntensity *
+          arrowConfig.AlphaMultiplier
 
         this._drawArrow(ctx, x, y, size, color, alpha, -1)
       }
