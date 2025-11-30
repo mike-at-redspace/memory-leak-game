@@ -58,6 +58,12 @@ export class GameEngine {
     })
 
     this.input = new InputController({ target: this.window })
+
+    // Hide gamepad initially (on START screen)
+    if (this.input._gamepad) {
+      this.input._gamepad.hide()
+    }
+
     this.world = new World()
     this.player = new Player()
 
@@ -633,6 +639,16 @@ export class GameEngine {
    */
   _transitionState(newState) {
     this.state = newState
+
+    // Show/hide gamepad based on game state
+    if (this.input && this.input._gamepad) {
+      if (newState === GameStates.PLAYING) {
+        this.input._gamepad.show()
+      } else {
+        // Hide on START, GAMEOVER, VICTORY
+        this.input._gamepad.hide()
+      }
+    }
   }
 
   /**

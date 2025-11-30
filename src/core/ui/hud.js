@@ -56,7 +56,7 @@ export class HudRenderer {
     this._drawScorePanel(stats, scale, level)
     this._drawInventoryPanel(hud, width, scale)
     this._drawMemoryBar(stats.playerHealth, width, height, scale)
-    this._drawMuteButton(isMuted, height, scale)
+    this._drawMuteButton(isMuted, width, height, scale)
 
     if (hud.messageTimer > 0) {
       this._drawStatusMessage(hud, width, height, scale)
@@ -290,11 +290,11 @@ export class HudRenderer {
    *
    * @access private
    */
-  _drawMuteButton(isMuted, canvasHeight, scale) {
+  _drawMuteButton(isMuted, canvasWidth, canvasHeight, scale) {
     const layout = this._layout
     const size = layout.muteButtonSize * scale
-    const x = layout.outerMargin
-    const y = canvasHeight - size - layout.outerMargin
+    const x = canvasWidth - size - layout.outerMargin
+    const y = layout.outerMargin
 
     // Update hit-box for input controller
     this._muteButtonRect = { x, y, w: size, h: size }

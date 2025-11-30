@@ -56,3 +56,17 @@ export const defaultViewport = () => ({
   width: defaultWindow.innerWidth ?? 0,
   height: defaultWindow.innerHeight ?? 0
 })
+
+/**
+ * Detects if the current device supports touch input.
+ *
+ * @returns {boolean} True if the device supports touch, false otherwise.
+ */
+export const isTouchDevice = () => {
+  if (typeof window === 'undefined') return false
+  return (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    (navigator.msMaxTouchPoints && navigator.msMaxTouchPoints > 0)
+  )
+}

@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <meta name="screen-orientation" content="landscape" />
     <title>Memory Leak</title>
     <meta
       name="description"
@@ -52,12 +56,102 @@
         image-rendering: pixelated;
         image-rendering: crisp-edges;
       }
+
+      #gameCanvas {
+        position: relative;
+        z-index: 1;
+      }
+
+      #TouchGamepad {
+        overflow: visible;
+        border-radius: 50%;
+      }
+
+      /* Force landscape for mobile devices under 768px */
+      @media screen and (max-width: 767px) {
+        html {
+          transform: rotate(90deg);
+          transform-origin: center center;
+          position: absolute;
+          width: 100vh;
+          height: 100vw;
+          top: 50%;
+          left: 50%;
+          margin-left: -50vh;
+          margin-top: -50vw;
+        }
+
+        body {
+          width: 100vh;
+          height: 100vw;
+          overflow: hidden;
+        }
+
+        #gameCanvas {
+          width: 100vh;
+          height: 100vw;
+        }
+      }
+
+      /* Orientation message for portrait mode on mobile */
+      #orientation-message {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #0c1016;
+        z-index: 10000;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        color: white;
+        font-family: sans-serif;
+        text-align: center;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
+      @media screen and (max-width: 767px) and (orientation: portrait) {
+        #orientation-message {
+          display: flex;
+        }
+      }
     </style>
   </head>
 
   <body>
     <!-- music by moodmode-->
+    <div id="orientation-message">
+      <h2>Please rotate your device</h2>
+      <p>This game requires landscape orientation</p>
+    </div>
     <canvas id="gameCanvas"></canvas>
     <script type="module" src="/src/main.js"></script>
+    <script>
+      // Force landscape orientation for mobile devices
+      if (window.innerWidth < 768) {
+        // Try to lock orientation if API is available
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch(() => {
+            // Orientation lock not supported or failed
+          })
+        } else if (screen.lockOrientation) {
+          screen.lockOrientation('landscape')
+        } else if (screen.mozLockOrientation) {
+          screen.mozLockOrientation('landscape')
+        } else if (screen.msLockOrientation) {
+          screen.msLockOrientation('landscape')
+        }
+
+        // Handle orientation changes
+        window.addEventListener('orientationchange', () => {
+          setTimeout(() => {
+            location.reload()
+          }, 100)
+        })
+      }
+    </script>
   </body>
 </html>
