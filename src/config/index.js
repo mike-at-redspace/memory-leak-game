@@ -113,7 +113,7 @@ export const GameStates = Object.freeze({
  */
 export const CollisionConfig = Object.freeze({
   Width: 32,
-  Height: 48, // Reduced from 64 to allow walking under items
+  Height: 64,
   VerticalOffset: 72
 })
 
