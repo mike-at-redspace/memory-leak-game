@@ -177,8 +177,8 @@ export const LayoutConfig = Object.freeze({
   sidePanelHeight: 112,
 
   // Spacing
-  outerMargin: 22,
-  innerPadding: 18,
+  outerMargin: 16,
+  innerPadding: 12,
 
   // Score panel
   scoreTitleY: 28,

@@ -330,10 +330,10 @@ export class Renderer {
     // On mobile, scale HUD down more aggressively to show more world
     let hudScale = this.scaleFactor
     if (width < 768) {
-      // Scale HUD down more on mobile: 0.5x at 320px, 0.6x at 640px, 0.7x at 768px
+      // Scale HUD down more on mobile: 0.35x at 320px, 0.45x at 640px, 0.55x at 768px
       // This makes the HUD smaller to maximize world visibility
-      hudScale = 0.5 + ((width - 320) / (768 - 320)) * 0.2 // 0.5x to 0.7x
-      hudScale = Math.max(0.5, Math.min(0.7, hudScale))
+      hudScale = 0.35 + ((width - 320) / (768 - 320)) * 0.2 // 0.35x to 0.55x
+      hudScale = Math.max(0.35, Math.min(0.55, hudScale))
     }
 
     this._hudRenderer.render(
