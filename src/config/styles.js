@@ -173,7 +173,7 @@ export const ScreenConfig = Object.freeze({
  */
 export const LayoutConfig = Object.freeze({
   // Panel dimensions
-  sidePanelWidth: 320,
+  sidePanelWidth: 240,
   sidePanelHeight: 112,
 
   // Spacing
@@ -189,9 +189,9 @@ export const LayoutConfig = Object.freeze({
   gridHeaderY: 28,
   gridItemStartY: 60,
   gridColumns: 4,
-  gridRowHeight: 42,
+  gridRowHeight: 38,
   gridBaseHeight: 48,
-  gridItemPadding: 18,
+  gridItemPadding: 12,
 
   // Memory bar
   memoryBarWidth: 400,
