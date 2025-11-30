@@ -776,14 +776,35 @@ export class GameEngine {
 
     if (!isFullscreen) {
       // Enter fullscreen
-      if (canvas.requestFullscreen) {
-        canvas.requestFullscreen()
-      } else if (canvas.webkitRequestFullscreen) {
-        canvas.webkitRequestFullscreen()
-      } else if (canvas.mozRequestFullScreen) {
-        canvas.mozRequestFullScreen()
-      } else if (canvas.msRequestFullscreen) {
-        canvas.msRequestFullscreen()
+      const promise = canvas.requestFullscreen
+        ? canvas.requestFullscreen()
+        : canvas.webkitRequestFullscreen
+          ? canvas.webkitRequestFullscreen()
+          : canvas.mozRequestFullScreen
+            ? canvas.mozRequestFullScreen()
+            : canvas.msRequestFullscreen
+              ? canvas.msRequestFullscreen()
+              : null
+
+      // Ensure gamepad is moved to fullscreen element after entering
+      // The fullscreenchange event will handle this, but we also wait for the promise
+      if (promise && this.input && this.input._gamepad) {
+        promise
+          .then(() => {
+            // Wait a bit more for fullscreen to be fully active
+            setTimeout(() => {
+              if (
+                this.input &&
+                this.input._gamepad &&
+                this.input._gamepad._repositionGamepad
+              ) {
+                this.input._gamepad._repositionGamepad()
+              }
+            }, 200)
+          })
+          .catch(() => {
+            // Fullscreen failed, ignore
+          })
       }
     } else {
       // Exit fullscreen
