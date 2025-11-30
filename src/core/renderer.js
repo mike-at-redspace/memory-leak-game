@@ -545,30 +545,7 @@ export class Renderer {
     ctx.save()
 
     // ──────────────────────────────
-    // 1. PLAYER SPRITE (middle layer)
-    // ──────────────────────────────
-    ctx.globalAlpha = 1
-    ctx.shadowBlur = 0
-
-    if (this._sheet.complete && this._sheet.naturalWidth) {
-      ctx.drawImage(
-        this._sheet,
-        player.frame * SpriteConfig.Width,
-        (player.direction || 0) * SpriteConfig.Height,
-        SpriteConfig.Width,
-        SpriteConfig.Height,
-        px,
-        py,
-        w,
-        h
-      )
-    } else {
-      ctx.fillStyle = 'white'
-      ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
-    }
-
-    // ──────────────────────────────
-    // 2. TRAIL EFFECTS (boost forward, slow backward)
+    // 1. TRAIL EFFECTS (behind sprite - boost forward, slow backward)
     // ──────────────────────────────
     const trailConfig = PlayerVisualConfig.BoostTrail
 
@@ -708,7 +685,30 @@ export class Renderer {
     }
 
     // ──────────────────────────────
-    // 3. ARROWS — BOOST UP, SLOW DOWN (top/head area; kept smaller & lower)
+    // 2. PLAYER SPRITE (middle layer)
+    // ──────────────────────────────
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
+
+    if (this._sheet.complete && this._sheet.naturalWidth) {
+      ctx.drawImage(
+        this._sheet,
+        player.frame * SpriteConfig.Width,
+        (player.direction || 0) * SpriteConfig.Height,
+        SpriteConfig.Width,
+        SpriteConfig.Height,
+        px,
+        py,
+        w,
+        h
+      )
+    } else {
+      ctx.fillStyle = 'white'
+      ctx.fillRect(px + 6, py + 6, w - 12, h - 12)
+    }
+
+    // ──────────────────────────────
+    // 3. ARROWS — BOOST UP, SLOW DOWN (top layer - above sprite)
     // ──────────────────────────────
 
     const arrowConfig = PlayerVisualConfig.Arrows
