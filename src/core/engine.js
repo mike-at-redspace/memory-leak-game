@@ -87,6 +87,8 @@ export class GameEngine {
     this.cheats = new CheatCodeHandler()
     this.cheats.register('jump', () => this._activateJumpCheat())
     this.cheats.register('hitbox', () => {}) // Toggle handled by CheatCodeHandler
+    this.cheats.register('flowstate', () => this._activateFlowStateCheat())
+    this.cheats.register('lag', () => this._activateLagCheat())
     this.cheats.attach(this.window)
   }
 
@@ -455,13 +457,7 @@ export class GameEngine {
    */
   _handleSpeedItem(item, x, y) {
     const isBoost = !!item.isBoost
-
-    // Apply speed multiplier
-    this.player.multiplier = isBoost ? StatsConfig.SpeedBoostMultiplier : 0.5
-
-    // SET THE VISUAL FLAGS — THIS WAS MISSING!
-    this.player.isBoosted = isBoost
-    this.player.isSlowed = !isBoost
+    const duration = StatsConfig.SpeedBoostDuration
 
     // Clear any existing timer
     if (this.player.speedTimer) {
@@ -469,19 +465,76 @@ export class GameEngine {
       this.player.speedTimer = null
     }
 
-    // Reset multiplier + visual flags when duration ends
-    this.player.speedTimer = setTimeout(() => {
-      this.player.multiplier = 1
-      this.player.isBoosted = false
+    // If collecting opposite effect, reverse it immediately
+    // If collecting same effect, add to duration
+    if (isBoost && this.player.isSlowed) {
+      // Boost reverses slow
+      this.player.multiplier = StatsConfig.SpeedBoostMultiplier
+      this.player.isBoosted = true
       this.player.isSlowed = false
-      this.player.speedTimer = null
-    }, StatsConfig.SpeedBoostDuration)
+      this.player.speedTimer = setTimeout(() => {
+        this.player.multiplier = 1
+        this.player.isBoosted = false
+        this.player.isSlowed = false
+        this.player.speedTimer = null
+      }, duration)
+    } else if (!isBoost && this.player.isBoosted) {
+      // Slow reverses boost
+      this.player.multiplier = 0.5
+      this.player.isBoosted = false
+      this.player.isSlowed = true
+      this.player.speedTimer = setTimeout(() => {
+        this.player.multiplier = 1
+        this.player.isBoosted = false
+        this.player.isSlowed = false
+        this.player.speedTimer = null
+      }, duration)
+    } else if (isBoost && this.player.isBoosted) {
+      // Boost while boosted: add duration
+      const remainingTime = this.player.speedTimerEndTime
+        ? Math.max(0, this.player.speedTimerEndTime - Date.now())
+        : 0
+      this.player.speedTimer = setTimeout(() => {
+        this.player.multiplier = 1
+        this.player.isBoosted = false
+        this.player.isSlowed = false
+        this.player.speedTimer = null
+        this.player.speedTimerEndTime = null
+      }, remainingTime + duration)
+      this.player.speedTimerEndTime = Date.now() + remainingTime + duration
+    } else if (!isBoost && this.player.isSlowed) {
+      // Slow while slowed: add duration
+      const remainingTime = this.player.speedTimerEndTime
+        ? Math.max(0, this.player.speedTimerEndTime - Date.now())
+        : 0
+      this.player.speedTimer = setTimeout(() => {
+        this.player.multiplier = 1
+        this.player.isBoosted = false
+        this.player.isSlowed = false
+        this.player.speedTimer = null
+        this.player.speedTimerEndTime = null
+      }, remainingTime + duration)
+      this.player.speedTimerEndTime = Date.now() + remainingTime + duration
+    } else {
+      // No existing effect: apply new effect
+      this.player.multiplier = isBoost ? StatsConfig.SpeedBoostMultiplier : 0.5
+      this.player.isBoosted = isBoost
+      this.player.isSlowed = !isBoost
+      this.player.speedTimer = setTimeout(() => {
+        this.player.multiplier = 1
+        this.player.isBoosted = false
+        this.player.isSlowed = false
+        this.player.speedTimer = null
+        this.player.speedTimerEndTime = null
+      }, duration)
+      this.player.speedTimerEndTime = Date.now() + duration
+    }
 
     // Particles & sound
     this.particles.spawn(
       x + PhysicsConfig.TileSize / 2,
       y + PhysicsConfig.TileSize / 2,
-      isBoost ? 'BOOST!' : 'LAG...',
+      isBoost ? 'Flow State' : 'LAG...',
       isBoost ? 'boost' : 'slow'
     )
     isBoost ? this.audio.playPowerUp() : this.audio.playDebuff()
@@ -698,5 +751,75 @@ export class GameEngine {
         this.audio.playPowerUp()
       }
     }
+  }
+
+  /**
+   * Activates the flowstate cheat (boost effect).
+   *
+   * @returns {void}
+   * @access private
+   */
+  _activateFlowStateCheat() {
+    // Apply boost effect
+    this.player.multiplier = StatsConfig.SpeedBoostMultiplier
+    this.player.isBoosted = true
+    this.player.isSlowed = false
+
+    // Clear any existing timer
+    if (this.player.speedTimer) {
+      clearTimeout(this.player.speedTimer)
+      this.player.speedTimer = null
+    }
+
+    // Reset multiplier + visual flags when duration ends
+    this.player.speedTimer = setTimeout(() => {
+      this.player.multiplier = 1
+      this.player.isBoosted = false
+      this.player.isSlowed = false
+      this.player.speedTimer = null
+    }, StatsConfig.SpeedBoostDuration)
+
+    // Particles & sound at player position
+    const playerCenterX =
+      this.player.x + (SpriteConfig.Width * SpriteConfig.Scale) / 2
+    const playerCenterY =
+      this.player.y + (SpriteConfig.Height * SpriteConfig.Scale) / 2
+    this.particles.spawn(playerCenterX, playerCenterY, 'Flow State', 'boost')
+    this.audio.playPowerUp()
+  }
+
+  /**
+   * Activates the lag cheat (slow effect).
+   *
+   * @returns {void}
+   * @access private
+   */
+  _activateLagCheat() {
+    // Apply slow effect
+    this.player.multiplier = 0.5
+    this.player.isBoosted = false
+    this.player.isSlowed = true
+
+    // Clear any existing timer
+    if (this.player.speedTimer) {
+      clearTimeout(this.player.speedTimer)
+      this.player.speedTimer = null
+    }
+
+    // Reset multiplier + visual flags when duration ends
+    this.player.speedTimer = setTimeout(() => {
+      this.player.multiplier = 1
+      this.player.isBoosted = false
+      this.player.isSlowed = false
+      this.player.speedTimer = null
+    }, StatsConfig.SpeedBoostDuration)
+
+    // Particles & sound at player position
+    const playerCenterX =
+      this.player.x + (SpriteConfig.Width * SpriteConfig.Scale) / 2
+    const playerCenterY =
+      this.player.y + (SpriteConfig.Height * SpriteConfig.Scale) / 2
+    this.particles.spawn(playerCenterX, playerCenterY, 'LAG...', 'slow')
+    this.audio.playDebuff()
   }
 }

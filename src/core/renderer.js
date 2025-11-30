@@ -64,15 +64,17 @@ export class FloatingTextSystem {
           : ParticleConfig.Decay.Default
 
       p.life -= dt * decayRate
-      p.x += p.velocity.x
-      p.y += p.velocity.y
+      // Make movement frame-rate independent and slower for boost particles
+      const speedMultiplier = p.type === 'boost' ? 0.3 : 1.0
+      p.x += p.velocity.x * dt * speedMultiplier
+      p.y += p.velocity.y * dt * speedMultiplier
 
       // Apply specific physics based on type
       if (p.type === 'damage') {
         p.x += Math.sin(Date.now() / ParticleConfig.WobbleSpeed) * 1
       }
       if (p.type === 'boost') {
-        p.velocity.y -= ParticleConfig.Gravity
+        p.velocity.y -= ParticleConfig.Gravity * dt
       }
 
       if (p.life <= 0) {
