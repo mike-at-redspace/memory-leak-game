@@ -57,6 +57,19 @@ export class TouchGamepad {
     this.canvas.addEventListener('touchend', this.handleTouchEnd.bind(this))
     this.canvas.addEventListener('touchcancel', this.handleTouchEnd.bind(this))
 
+    // Listen for fullscreen changes to move gamepad into fullscreen element
+    this._boundFullscreenChange = this._handleFullscreenChange.bind(this)
+    document.addEventListener('fullscreenchange', this._boundFullscreenChange)
+    document.addEventListener(
+      'webkitfullscreenchange',
+      this._boundFullscreenChange
+    )
+    document.addEventListener(
+      'mozfullscreenchange',
+      this._boundFullscreenChange
+    )
+    document.addEventListener('MSFullscreenChange', this._boundFullscreenChange)
+
     // Start render loop
     this.draw()
   }
@@ -204,7 +217,54 @@ export class TouchGamepad {
     }
   }
 
+  /**
+   * Handles fullscreen changes to keep gamepad visible.
+   *
+   * @access private
+   */
+  _handleFullscreenChange() {
+    if (!this.canvas) return
+
+    const fullscreenElement =
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement
+
+    if (fullscreenElement) {
+      // Entering fullscreen - move gamepad into fullscreen element
+      if (this.canvas.parentNode !== fullscreenElement) {
+        fullscreenElement.appendChild(this.canvas)
+      }
+    } else {
+      // Exiting fullscreen - move gamepad back to body
+      if (this.canvas.parentNode !== document.body) {
+        document.body.appendChild(this.canvas)
+      }
+    }
+  }
+
   dispose() {
+    // Remove fullscreen listeners
+    if (this._boundFullscreenChange) {
+      document.removeEventListener(
+        'fullscreenchange',
+        this._boundFullscreenChange
+      )
+      document.removeEventListener(
+        'webkitfullscreenchange',
+        this._boundFullscreenChange
+      )
+      document.removeEventListener(
+        'mozfullscreenchange',
+        this._boundFullscreenChange
+      )
+      document.removeEventListener(
+        'MSFullscreenChange',
+        this._boundFullscreenChange
+      )
+    }
+
     if (this.canvas && this.canvas.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas)
     }

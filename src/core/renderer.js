@@ -157,11 +157,11 @@ export class Renderer {
    */
   get scaleFactor() {
     const width = this._canvas.width
-    // Scale down for mobile devices under 768px
+    // Scale down for mobile devices under 768px (more zoomed out)
     if (width < 768) {
-      // Scale proportionally: 0.6x at 320px, 0.8x at 640px, 1.0x at 768px
-      const mobileScale = 0.6 + ((width - 320) / (768 - 320)) * 0.4
-      return Math.max(0.6, Math.min(1.0, mobileScale))
+      // Scale proportionally: 0.4x at 320px, 0.6x at 640px, 0.8x at 768px
+      const mobileScale = 0.4 + ((width - 320) / (768 - 320)) * 0.4
+      return Math.max(0.4, Math.min(0.8, mobileScale))
     }
     if (width > ScreenConfig.LargeScreenThreshold) {
       // Scale proportionally for screens over 1920px (reduced scaling)
@@ -239,13 +239,23 @@ export class Renderer {
     }
     this._renderParticles(particles, camera)
 
+    // Calculate HUD scale factor
+    // On mobile, the canvas is scaled via CSS transform, so we need to compensate
+    // to ensure HUD elements are readable. Use inverse of canvas transform scale.
+    let hudScale = this.scaleFactor
+    if (width < 768) {
+      // Canvas is scaled down via CSS transform, so HUD should scale up to compensate
+      // This ensures HUD remains readable on mobile
+      hudScale = 1.0 / this.scaleFactor
+    }
+
     this._hudRenderer.render(
       stats,
       hud,
       isMuted,
       width,
       height,
-      this.scaleFactor,
+      hudScale,
       currentLevel
     )
   }
